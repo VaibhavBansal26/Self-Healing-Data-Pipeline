@@ -183,6 +183,17 @@ def human_approval_gate(state: Dict[str, Any]) -> Dict[str, Any]:
     requires_approval = decision.get("requires_human_approval", False)
     risk_level = decision.get("risk_level")
 
+    # send_to_dlq needs no approval: it is the safe default and repairs nothing.
+    if decision.get("action") == "send_to_dlq":
+        state.setdefault("agent_trace", []).append(
+            {
+                "step": "Risk gate",
+                "reason": "Routing to the DLQ is the safe default and needs no approval.",
+                "act": "continue_to_dlq",
+            }
+        )
+        return state
+
     if not requires_approval and risk_level != "high":
         state.setdefault("agent_trace", []).append(
             {

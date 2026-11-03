@@ -24,3 +24,25 @@ jobs:
         run: PYTHONPATH=. pytest -q tests
       - name: Validate Docker Compose
         run: docker compose config
+
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Start Kafka, Postgres and Redis
+        run: docker compose -f tests/integration/docker-compose.yml up -d --wait
+      - name: Integration tests
+        run: RUN_INTEGRATION=1 PYTHONPATH=. pytest tests/integration -v
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose -f tests/integration/docker-compose.yml logs --tail=100
+      - name: Stop services
+        if: always()
+        run: docker compose -f tests/integration/docker-compose.yml down -v
