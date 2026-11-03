@@ -20,7 +20,15 @@ def make_event(i: int, bad_rate: float) -> dict:
         "schema_version": 1,
     }
     if random.random() < bad_rate:
-        failure_type = random.choice(["amount_as_string", "missing_currency", "bad_status", "negative_amount", "missing_customer"])
+        failure_type = random.choice(
+            [
+                "amount_as_string",
+                "missing_currency",
+                "bad_status",
+                "negative_amount",
+                "missing_customer",
+            ]
+        )
         if failure_type == "amount_as_string":
             event["amount"] = str(event["amount"])
         elif failure_type == "missing_currency":
@@ -45,11 +53,15 @@ def main() -> None:
     start = time.perf_counter()
     for i in range(args.events):
         event = make_event(i, args.bad_rate)
-        producer.produce(args.topic, key=event.get("event_id", str(i)), value=json.dumps(event))
+        producer.produce(
+            args.topic, key=event.get("event_id", str(i)), value=json.dumps(event)
+        )
         producer.poll(0)
     producer.flush()
     elapsed = time.perf_counter() - start
-    print(f"Produced {args.events} events in {elapsed:.2f}s = {args.events / max(elapsed, 0.001):.2f} events/sec")
+    print(
+        f"Produced {args.events} events in {elapsed:.2f}s = {args.events / max(elapsed, 0.001):.2f} events/sec"
+    )
 
 
 if __name__ == "__main__":

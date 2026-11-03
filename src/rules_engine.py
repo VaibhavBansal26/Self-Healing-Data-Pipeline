@@ -116,7 +116,9 @@ def decide_repair(payload: Dict[str, Any], error_message: str = "") -> RuleDecis
     )
 
 
-def apply_repair_action(payload: Dict[str, Any], action: str) -> Tuple[Optional[Dict[str, Any]], str]:
+def apply_repair_action(
+    payload: Dict[str, Any], action: str
+) -> Tuple[Optional[Dict[str, Any]], str]:
     repaired = dict(payload)
     if action == "cast_amount_to_float":
         repaired["amount"] = float(repaired["amount"])

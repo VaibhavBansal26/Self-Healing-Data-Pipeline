@@ -15,11 +15,17 @@ def _is_numeric_string(value: Any) -> bool:
 
 
 def similar_incidents_conflict(similar_incidents: List[Dict[str, Any]]) -> bool:
-    statuses = {str(item.get("status")) for item in similar_incidents if item.get("status")}
+    statuses = {
+        str(item.get("status")) for item in similar_incidents if item.get("status")
+    }
     return "failed" in statuses and "healed" in statuses
 
 
-def enforce_decision_policy(decision: Dict[str, Any], payload: Dict[str, Any], similar_incidents: List[Dict[str, Any]]) -> Dict[str, Any]:
+def enforce_decision_policy(
+    decision: Dict[str, Any],
+    payload: Dict[str, Any],
+    similar_incidents: List[Dict[str, Any]],
+) -> Dict[str, Any]:
     """Apply deterministic safety rules after the agent chooses a repair action."""
     decision = dict(decision or {})
     action = decision.get("action", "manual_review")
@@ -30,14 +36,18 @@ def enforce_decision_policy(decision: Dict[str, Any], payload: Dict[str, Any], s
         high_risk_reasons.append(f"confidence below {LLM_CONFIDENCE_THRESHOLD}")
 
     # Casting a numeric string like "29.50" to 29.50 is safe because value is preserved.
-    if action == "cast_amount_to_float" and not _is_numeric_string(payload.get("amount")):
+    if action == "cast_amount_to_float" and not _is_numeric_string(
+        payload.get("amount")
+    ):
         high_risk_reasons.append("amount is not a clean numeric string")
 
     if payload.get("event_id") in {None, ""}:
         decision["action"] = "send_to_dlq"
         decision["risk_level"] = "high"
         decision["requires_human_approval"] = False
-        decision["reason"] = f"{decision.get('reason', '')} Guardrail: missing event_id cannot be replayed safely.".strip()
+        decision["reason"] = (
+            f"{decision.get('reason', '')} Guardrail: missing event_id cannot be replayed safely.".strip()
+        )
         return decision
 
     if payload.get("customer_id") in {None, ""}:
@@ -57,7 +67,9 @@ def enforce_decision_policy(decision: Dict[str, Any], payload: Dict[str, Any], s
     if high_risk_reasons:
         decision["risk_level"] = "high"
         decision["requires_human_approval"] = True
-        decision["reason"] = f"{decision.get('reason', '')} Guardrail: {', '.join(high_risk_reasons)}".strip()
+        decision["reason"] = (
+            f"{decision.get('reason', '')} Guardrail: {', '.join(high_risk_reasons)}".strip()
+        )
     else:
         decision.setdefault("risk_level", "low")
         decision.setdefault("requires_human_approval", False)

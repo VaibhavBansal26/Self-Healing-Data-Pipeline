@@ -5,7 +5,9 @@ from confluent_kafka.admin import AdminClient, NewTopic
 from src.config import KAFKA_BOOTSTRAP_SERVERS
 
 
-def ensure_topic(topic: str, partitions: int = 1, replication_factor: int = 1) -> Dict[str, Any]:
+def ensure_topic(
+    topic: str, partitions: int = 1, replication_factor: int = 1
+) -> Dict[str, Any]:
     admin = AdminClient({"bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS})
     topics = set(admin.list_topics(timeout=5).topics.keys())
     if topic in topics:
@@ -18,7 +20,12 @@ def ensure_topic(topic: str, partitions: int = 1, replication_factor: int = 1) -
             out[name] = "created"
         except Exception as exc:
             out[name] = str(exc)
-    return {"ok": topic in out and "created" in out[topic], "action": "create_topic", "topic": topic, "result": out}
+    return {
+        "ok": topic in out and "created" in out[topic],
+        "action": "create_topic",
+        "topic": topic,
+        "result": out,
+    }
 
 
 def topic_inventory() -> Dict[str, Any]:

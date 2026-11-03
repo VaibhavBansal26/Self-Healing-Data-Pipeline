@@ -43,8 +43,14 @@ class FakeConnection:
 
 def test_get_pipeline_summary_includes_dlq_count(monkeypatch):
     cursor = FakeCursor(row=(10, 4, 2, 1, 1, 2))
-    monkeypatch.setattr(dashboard_service, "get_db_connection", lambda: FakeConnection(cursor))
-    monkeypatch.setattr(dashboard_service, "call_pipeline_tool", lambda name, **kwargs: {"message_count": 3})
+    monkeypatch.setattr(
+        dashboard_service, "get_db_connection", lambda: FakeConnection(cursor)
+    )
+    monkeypatch.setattr(
+        dashboard_service,
+        "call_pipeline_tool",
+        lambda name, **kwargs: {"message_count": 3},
+    )
 
     summary = dashboard_service.get_pipeline_summary()
 
@@ -61,9 +67,13 @@ def test_update_incident_status_rejects_unknown_status():
 
 def test_update_incident_status_returns_updated(monkeypatch):
     cursor = FakeCursor(row=(7, "evt_7", "approved_for_replay"))
-    monkeypatch.setattr(dashboard_service, "get_db_connection", lambda: FakeConnection(cursor))
+    monkeypatch.setattr(
+        dashboard_service, "get_db_connection", lambda: FakeConnection(cursor)
+    )
 
-    result = dashboard_service.update_incident_status(7, "approved_for_replay", "looks safe")
+    result = dashboard_service.update_incident_status(
+        7, "approved_for_replay", "looks safe"
+    )
 
     assert result == {
         "updated": True,

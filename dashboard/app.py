@@ -170,7 +170,9 @@ with tab_overview:
     if orders:
         st.dataframe(pd.DataFrame(orders), use_container_width=True)
     else:
-        st.info("No clean orders yet. Use the test event generator or demo producer tab to publish data.")
+        st.info(
+            "No clean orders yet. Use the test event generator or demo producer tab to publish data."
+        )
 
     st.subheader("Healing status")
     chart_data = pd.DataFrame(
@@ -199,16 +201,23 @@ with tab_controls:
 
     with left:
         st.markdown("### Producer")
-        transform_before_publish = st.checkbox("Apply deterministic transformation before publishing demo batch", value=False)
+        transform_before_publish = st.checkbox(
+            "Apply deterministic transformation before publishing demo batch",
+            value=False,
+        )
         if st.button("Publish demo dataset to Kafka"):
             result = publish_demo_dataset(transform=transform_before_publish)
             refresh_dashboard()
-            st.success(f"Published {result['published_count']} events to {result['topic']}.")
+            st.success(
+                f"Published {result['published_count']} events to {result['topic']}."
+            )
             st.json(result)
 
         st.markdown("### Test event generator")
         scenario = st.selectbox("Scenario", get_demo_catalog().get("scenarios", []))
-        scenario_transform = st.checkbox("Transform generated event before publish", value=False)
+        scenario_transform = st.checkbox(
+            "Transform generated event before publish", value=False
+        )
         preview = build_test_event(scenario=scenario)
         st.markdown("Generated payload preview")
         st.json(preview)
@@ -219,7 +228,10 @@ with tab_controls:
             st.success(f"Published {scenario} event.")
             st.json(result)
         if col_batch.button("Publish one event per scenario"):
-            results = [publish_test_event(s, transform=scenario_transform) for s in get_demo_catalog().get("scenarios", [])]
+            results = [
+                publish_test_event(s, transform=scenario_transform)
+                for s in get_demo_catalog().get("scenarios", [])
+            ]
             refresh_dashboard()
             st.success(f"Published {len(results)} scenario events.")
             st.json(results)
@@ -232,8 +244,12 @@ with tab_controls:
             "currency": "usd",
             "status": "PAY",
         }
-        custom_text = st.text_area("Custom event JSON", value=json.dumps(default_event, indent=2), height=220)
-        custom_transform = st.checkbox("Transform custom event before publishing", value=True)
+        custom_text = st.text_area(
+            "Custom event JSON", value=json.dumps(default_event, indent=2), height=220
+        )
+        custom_transform = st.checkbox(
+            "Transform custom event before publishing", value=True
+        )
         if st.button("Publish custom event"):
             try:
                 payload = json.loads(custom_text)
@@ -252,7 +268,9 @@ with tab_controls:
         if col_a.button("Pause consumer"):
             set_consumer_paused(True)
             refresh_dashboard()
-            st.warning("Consumer pause flag enabled. The container stays alive but stops polling Kafka.")
+            st.warning(
+                "Consumer pause flag enabled. The container stays alive but stops polling Kafka."
+            )
         if col_b.button("Resume consumer"):
             set_consumer_paused(False)
             refresh_dashboard()
@@ -276,7 +294,9 @@ Consumer metrics: http://localhost:9109/metrics
 
 with tab_data_api:
     st.subheader("Data API Playground")
-    st.write("Use the FastAPI service to publish events, preview transformations, inspect summary, and control the consumer.")
+    st.write(
+        "Use the FastAPI service to publish events, preview transformations, inspect summary, and control the consumer."
+    )
     st.link_button("Open Swagger UI", "http://localhost:8000/docs")
     st.link_button("Open API health", "http://localhost:8000/health")
     st.code(
@@ -310,7 +330,9 @@ curl -X POST http://localhost:8000/transform \\
 
 with tab_transform:
     st.subheader("Transformation playground")
-    st.write("Preview deterministic cleaning before the record enters validation or the LangGraph healing path.")
+    st.write(
+        "Preview deterministic cleaning before the record enters validation or the LangGraph healing path."
+    )
     sample = {
         "event_id": "transform_preview_1",
         "customer_id": " cust_99 ",
@@ -318,7 +340,9 @@ with tab_transform:
         "currency": "usd",
         "status": "PAY",
     }
-    transform_text = st.text_area("Payload to transform", value=json.dumps(sample, indent=2), height=250)
+    transform_text = st.text_area(
+        "Payload to transform", value=json.dumps(sample, indent=2), height=250
+    )
     if st.button("Preview transformation"):
         try:
             result = preview_transformation(json.loads(transform_text))
@@ -330,15 +354,29 @@ with tab_transform:
 
 with tab_agent_trace:
     st.subheader("Agent decision trace")
-    st.write("This screen explains how malformed records moved through validation, LangGraph diagnosis, guardrails, repair, verification, and final routing.")
+    st.write(
+        "This screen explains how malformed records moved through validation, LangGraph diagnosis, guardrails, repair, verification, and final routing."
+    )
     trace_left, trace_right = st.columns([1, 1])
     with trace_left:
-        trace_status = st.selectbox("Trace status filter", ["all", "healed", "manual_review", "failed", "approved_for_replay", "closed"])
+        trace_status = st.selectbox(
+            "Trace status filter",
+            [
+                "all",
+                "healed",
+                "manual_review",
+                "failed",
+                "approved_for_replay",
+                "closed",
+            ],
+        )
     with trace_right:
         trace_limit = st.slider("Trace rows", 5, 100, 25, key="trace_limit")
     traces = cached_traces(trace_status, trace_limit)
     if not traces:
-        st.info("No agent traces yet. Publish malformed events from the Producer & Consumer tab.")
+        st.info(
+            "No agent traces yet. Publish malformed events from the Producer & Consumer tab."
+        )
     for trace in traces:
         title = f"Incident {trace['incident_id']} | {trace.get('event_id')} | {trace.get('status')}"
         with st.expander(title):
@@ -353,13 +391,25 @@ with tab_agent_trace:
                 st.dataframe(steps, use_container_width=True, hide_index=True)
             st.markdown("**Validation error**")
             st.code(trace.get("error_message") or "", language="text")
-            render_payload_pair(trace.get("original_payload"), trace.get("healed_payload"))
+            render_payload_pair(
+                trace.get("original_payload"), trace.get("healed_payload")
+            )
 
 with tab_incidents:
     st.subheader("Repairs and human approval queue")
     left, right = st.columns([1, 1])
     with left:
-        status_filter = st.selectbox("Filter by status", ["all", "healed", "manual_review", "failed", "approved_for_replay", "closed"])
+        status_filter = st.selectbox(
+            "Filter by status",
+            [
+                "all",
+                "healed",
+                "manual_review",
+                "failed",
+                "approved_for_replay",
+                "closed",
+            ],
+        )
     with right:
         limit = st.slider("Rows", 5, 100, 25)
 
@@ -379,15 +429,21 @@ with tab_incidents:
         st.dataframe(pd.DataFrame(table_rows), use_container_width=True)
 
         selected_id = st.number_input("Incident id to inspect", min_value=1, step=1)
-        selected = next((item for item in incidents if item["incident_id"] == selected_id), None)
+        selected = next(
+            (item for item in incidents if item["incident_id"] == selected_id), None
+        )
         if selected:
-            render_payload_pair(selected.get("original_payload"), selected.get("healed_payload"))
+            render_payload_pair(
+                selected.get("original_payload"), selected.get("healed_payload")
+            )
             st.markdown("**Full incident record**")
             st.json(selected)
             reviewer_notes = st.text_area("Reviewer notes")
             col_a, col_b, col_c = st.columns(3)
             if col_a.button("Approve for replay"):
-                update_incident_status(selected_id, "approved_for_replay", reviewer_notes)
+                update_incident_status(
+                    selected_id, "approved_for_replay", reviewer_notes
+                )
                 refresh_dashboard()
                 st.success("Incident approved for replay.")
             if col_b.button("Close as healed"):
@@ -404,7 +460,9 @@ with tab_incidents:
                 result = replay_payload_to_raw_topic(payload)
                 st.success(result)
         else:
-            st.info("Enter an incident id shown in the table to inspect payloads and approve repairs.")
+            st.info(
+                "Enter an incident id shown in the table to inspect payloads and approve repairs."
+            )
     else:
         st.info("No incidents found for this filter.")
 
@@ -428,7 +486,9 @@ with tab_reconciliation:
     if runs:
         st.dataframe(pd.DataFrame(runs), use_container_width=True)
     else:
-        st.info("No reconciliation runs yet. Start Airflow or run reconciliation manually.")
+        st.info(
+            "No reconciliation runs yet. Start Airflow or run reconciliation manually."
+        )
 
 with tab_testing:
     st.subheader("How to test this project")

@@ -7,8 +7,15 @@ from src.schemas import OrderEvent
 SUPPORTED_SCHEMA_VERSIONS = {1, 2}
 
 STATUS_MAP = {
-    "pay": "paid", "paid": "paid", "paid ": "paid", "created": "created", "create": "created",
-    "cancel": "cancelled", "cancelled": "cancelled", "refund": "refunded", "refunded": "refunded",
+    "pay": "paid",
+    "paid": "paid",
+    "paid ": "paid",
+    "created": "created",
+    "create": "created",
+    "cancel": "cancelled",
+    "cancelled": "cancelled",
+    "refund": "refunded",
+    "refunded": "refunded",
 }
 
 
@@ -26,7 +33,10 @@ def normalize_schema(payload: Dict[str, Any]) -> tuple[Dict[str, Any], list[str]
             normalized["amount"] = float(normalized["amount_cents"]) / 100.0
             steps.append("schema_v2.amount_cents_to_amount")
         if "status" not in normalized and "order_state" in normalized:
-            normalized["status"] = STATUS_MAP.get(str(normalized["order_state"]).lower().strip(), str(normalized["order_state"]).lower().strip())
+            normalized["status"] = STATUS_MAP.get(
+                str(normalized["order_state"]).lower().strip(),
+                str(normalized["order_state"]).lower().strip(),
+            )
             steps.append("schema_v2.order_state_to_status")
         normalized.pop("amount_cents", None)
         normalized.pop("order_state", None)
@@ -41,7 +51,10 @@ def validate_schema_version(payload: Dict[str, Any]) -> Tuple[bool, str]:
     except Exception:
         return False, "schema_version must be an integer"
     if version not in SUPPORTED_SCHEMA_VERSIONS:
-        return False, f"Unsupported schema_version={version}. Supported versions={sorted(SUPPORTED_SCHEMA_VERSIONS)}"
+        return (
+            False,
+            f"Unsupported schema_version={version}. Supported versions={sorted(SUPPORTED_SCHEMA_VERSIONS)}",
+        )
     return True, "ok"
 
 

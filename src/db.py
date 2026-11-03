@@ -13,6 +13,7 @@ class IdempotencyConflictError(Exception):
 
 def get_db_connection():
     import psycopg2
+
     return psycopg2.connect(**POSTGRES_CONFIG)
 
 
@@ -22,7 +23,9 @@ def insert_order(order):
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT event_hash FROM orders WHERE event_id = %s;", (order.event_id,))
+            cur.execute(
+                "SELECT event_hash FROM orders WHERE event_id = %s;", (order.event_id,)
+            )
             row = cur.fetchone()
             if row:
                 existing_hash = row[0]
@@ -140,20 +143,25 @@ def count_orders_and_incidents() -> Tuple[int, int, int]:
             orders_count = cur.fetchone()[0]
             cur.execute("SELECT COUNT(*) FROM pipeline_incidents;")
             incident_count = cur.fetchone()[0]
-            cur.execute("SELECT COUNT(*) FROM pipeline_incidents WHERE status IN ('failed', 'manual_review');")
+            cur.execute(
+                "SELECT COUNT(*) FROM pipeline_incidents WHERE status IN ('failed', 'manual_review');"
+            )
             unresolved = cur.fetchone()[0]
     return orders_count, incident_count, unresolved
 
 
-def insert_reconciliation_run(orders_count: int, incident_count: int, dlq_count: int, unresolved: int, notes: str):
+def insert_reconciliation_run(
+    orders_count: int, incident_count: int, dlq_count: int, unresolved: int, notes: str
+):
     query = """
     INSERT INTO reconciliation_runs(orders_count, incident_count, dlq_count, unresolved_incident_count, notes)
     VALUES (%s, %s, %s, %s, %s);
     """
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            cur.execute(query, (orders_count, incident_count, dlq_count, unresolved, notes))
-
+            cur.execute(
+                query, (orders_count, incident_count, dlq_count, unresolved, notes)
+            )
 
 
 def insert_pipeline_step_incident(
@@ -215,7 +223,11 @@ def update_pipeline_step_incident(
                 (
                     status,
                     recovery_action,
-                    json.dumps(verification_result) if verification_result is not None else None,
+                    (
+                        json.dumps(verification_result)
+                        if verification_result is not None
+                        else None
+                    ),
                     step_incident_id,
                 ),
             )
@@ -264,6 +276,7 @@ def list_pipeline_step_incidents(limit: int = 50, status: Optional[str] = None):
 
 # ---- Upgrade helpers: journey, schema evolution, replay audit reads ----
 
+
 def log_event_journey(
     event_id: Optional[str],
     payload: Optional[Dict[str, Any]],
@@ -284,10 +297,21 @@ def log_event_journey(
         """
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                cur.execute(query, (
-                    event_id, event_hash, stage, component, status, reason, action, risk_level,
-                    json.dumps(payload or {}), json.dumps(metadata or {})
-                ))
+                cur.execute(
+                    query,
+                    (
+                        event_id,
+                        event_hash,
+                        stage,
+                        component,
+                        status,
+                        reason,
+                        action,
+                        risk_level,
+                        json.dumps(payload or {}),
+                        json.dumps(metadata or {}),
+                    ),
+                )
     except Exception as exc:
         print(f"event_journey logging skipped: {exc}")
 
@@ -311,11 +335,22 @@ def list_event_journey(limit: int = 200, event_id: Optional[str] = None):
         with conn.cursor() as cur:
             cur.execute(query, params)
             rows = cur.fetchall()
-    return [{
-        "journey_id": r[0], "event_id": r[1], "stage": r[2], "component": r[3], "status": r[4],
-        "reason": r[5], "action": r[6], "risk_level": r[7], "payload": r[8], "metadata": r[9],
-        "created_at": r[10].isoformat() if r[10] else None,
-    } for r in rows]
+    return [
+        {
+            "journey_id": r[0],
+            "event_id": r[1],
+            "stage": r[2],
+            "component": r[3],
+            "status": r[4],
+            "reason": r[5],
+            "action": r[6],
+            "risk_level": r[7],
+            "payload": r[8],
+            "metadata": r[9],
+            "created_at": r[10].isoformat() if r[10] else None,
+        }
+        for r in rows
+    ]
 
 
 def list_schema_versions():
@@ -328,10 +363,18 @@ def list_schema_versions():
         with conn.cursor() as cur:
             cur.execute(query)
             rows = cur.fetchall()
-    return [{
-        "schema_version": r[0], "schema_name": r[1], "compatibility": r[2], "description": r[3],
-        "example_payload": r[4], "is_supported": r[5], "created_at": r[6].isoformat() if r[6] else None,
-    } for r in rows]
+    return [
+        {
+            "schema_version": r[0],
+            "schema_name": r[1],
+            "compatibility": r[2],
+            "description": r[3],
+            "example_payload": r[4],
+            "is_supported": r[5],
+            "created_at": r[6].isoformat() if r[6] else None,
+        }
+        for r in rows
+    ]
 
 
 def list_replay_audit(limit: int = 100):
@@ -346,8 +389,17 @@ def list_replay_audit(limit: int = 100):
         with conn.cursor() as cur:
             cur.execute(query, (limit,))
             rows = cur.fetchall()
-    return [{
-        "replay_id": r[0], "event_id": r[1], "original_payload": r[2], "replayed_payload": r[3],
-        "replay_status": r[4], "reviewer": r[5], "reviewer_notes": r[6], "failure_reason": r[7],
-        "created_at": r[8].isoformat() if r[8] else None,
-    } for r in rows]
+    return [
+        {
+            "replay_id": r[0],
+            "event_id": r[1],
+            "original_payload": r[2],
+            "replayed_payload": r[3],
+            "replay_status": r[4],
+            "reviewer": r[5],
+            "reviewer_notes": r[6],
+            "failure_reason": r[7],
+            "created_at": r[8].isoformat() if r[8] else None,
+        }
+        for r in rows
+    ]

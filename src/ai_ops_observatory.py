@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from src.pipeline_health import get_pipeline_health
 from src.trace_events import list_trace_events
@@ -49,19 +49,35 @@ def log_diagnosis_samples() -> Dict[str, Any]:
     diagnosed = []
     for row in samples:
         diagnosis = diagnose_text(row["raw_log"])
-        issue = diagnosis[0] if diagnosis else {"problem_type": "unknown", "recommendation": "inspect_manually"}
+        issue = (
+            diagnosis[0]
+            if diagnosis
+            else {"problem_type": "unknown", "recommendation": "inspect_manually"}
+        )
         diagnosed.append(
             {
                 **row,
                 "problem_type": issue.get("problem_type", "unknown"),
-                "recommended_action": issue.get("recommendation", issue.get("suggested_action", "inspect_manually")),
-                "agent_update": _human_update(row["stage"], issue.get("problem_type", "unknown"), issue.get("recommendation", "inspect_manually")),
+                "recommended_action": issue.get(
+                    "recommendation", issue.get("suggested_action", "inspect_manually")
+                ),
+                "agent_update": _human_update(
+                    row["stage"],
+                    issue.get("problem_type", "unknown"),
+                    issue.get("recommendation", "inspect_manually"),
+                ),
             }
         )
     return {
         "description": "Log diagnosis converts raw operational logs into stage, problem type, severity, and recovery guidance.",
         "rows": diagnosed,
-        "coverage": ["consumer logs", "data-api logs", "Airflow task logs", "LLM/tool errors", "database connectivity errors"],
+        "coverage": [
+            "consumer logs",
+            "data-api logs",
+            "Airflow task logs",
+            "LLM/tool errors",
+            "database connectivity errors",
+        ],
     }
 
 
@@ -83,7 +99,9 @@ def vector_memory_explorer() -> Dict[str, Any]:
                     "expected_memory": result.get("expected_memory"),
                     "used_by_agent": idx <= 3,
                     "previous_action": item.get("action", "restart_or_route"),
-                    "previous_outcome": item.get("outcome", "recovered" if idx < 3 else "unknown"),
+                    "previous_outcome": item.get(
+                        "outcome", "recovered" if idx < 3 else "unknown"
+                    ),
                 }
             )
     return {
@@ -102,16 +120,56 @@ def rag_decision_flow() -> Dict[str, Any]:
     return {
         "description": "RAG is used after detection and before action selection. It makes the agent compare the current failure with similar previous incidents before choosing a recovery action.",
         "nodes": [
-            {"id": "detect", "label": "Detect failure", "status": "complete", "detail": "Health check/log classifier finds a stage issue."},
-            {"id": "query", "label": "Query memory", "status": "complete", "detail": "Failure signature is embedded and matched against prior incidents."},
-            {"id": "retrieve", "label": "Retrieve evidence", "status": "complete", "detail": "Top similar incidents and outcomes are returned."},
-            {"id": "compare", "label": "Compare outcomes", "status": "complete", "detail": "Agent checks which actions previously recovered or failed."},
-            {"id": "plan", "label": "Plan recovery", "status": "active", "detail": "Agent selects an allowlisted action with risk policy."},
-            {"id": "verify", "label": "Verify", "status": "pending", "detail": "Same health check runs after recovery."},
-            {"id": "remember", "label": "Store memory", "status": "pending", "detail": "Outcome is stored for future decisions."},
+            {
+                "id": "detect",
+                "label": "Detect failure",
+                "status": "complete",
+                "detail": "Health check/log classifier finds a stage issue.",
+            },
+            {
+                "id": "query",
+                "label": "Query memory",
+                "status": "complete",
+                "detail": "Failure signature is embedded and matched against prior incidents.",
+            },
+            {
+                "id": "retrieve",
+                "label": "Retrieve evidence",
+                "status": "complete",
+                "detail": "Top similar incidents and outcomes are returned.",
+            },
+            {
+                "id": "compare",
+                "label": "Compare outcomes",
+                "status": "complete",
+                "detail": "Agent checks which actions previously recovered or failed.",
+            },
+            {
+                "id": "plan",
+                "label": "Plan recovery",
+                "status": "active",
+                "detail": "Agent selects an allowlisted action with risk policy.",
+            },
+            {
+                "id": "verify",
+                "label": "Verify",
+                "status": "pending",
+                "detail": "Same health check runs after recovery.",
+            },
+            {
+                "id": "remember",
+                "label": "Store memory",
+                "status": "pending",
+                "detail": "Outcome is stored for future decisions.",
+            },
         ],
         "edges": [
-            ["detect", "query"], ["query", "retrieve"], ["retrieve", "compare"], ["compare", "plan"], ["plan", "verify"], ["verify", "remember"]
+            ["detect", "query"],
+            ["query", "retrieve"],
+            ["retrieve", "compare"],
+            ["compare", "plan"],
+            ["plan", "verify"],
+            ["verify", "remember"],
         ],
     }
 
@@ -132,7 +190,12 @@ def mcp_agent_mesh() -> Dict[str, Any]:
         {
             "agent": "Database MCP Agent",
             "status": "healthy",
-            "tools": ["check_tables", "query_incidents", "replay_audit", "orders_count"],
+            "tools": [
+                "check_tables",
+                "query_incidents",
+                "replay_audit",
+                "orders_count",
+            ],
             "last_tool_called": "check_tables",
             "latency_ms": 44,
             "success_rate": 0.94,
@@ -176,12 +239,42 @@ def mcp_agent_mesh() -> Dict[str, Any]:
         },
     ]
     collaboration = [
-        {"step": 1, "agent": "Coordinator Agent", "action": "Detected unhealthy stage from pipeline health map", "status": "complete"},
-        {"step": 2, "agent": "Observability MCP Agent", "action": "Classified recent logs and mapped them to failure type", "status": "complete"},
-        {"step": 3, "agent": "Vector Memory", "action": "Retrieved similar incidents and prior recovery outcomes", "status": "complete"},
-        {"step": 4, "agent": "Kafka/Database/Redis MCP Agent", "action": "Selected component-specific tool based on failure", "status": "complete"},
-        {"step": 5, "agent": "Recovery MCP Agent", "action": "Prepared safe recovery or approval request", "status": "active"},
-        {"step": 6, "agent": "Verifier Agent", "action": "Runs post-action health check before marking recovered", "status": "pending"},
+        {
+            "step": 1,
+            "agent": "Coordinator Agent",
+            "action": "Detected unhealthy stage from pipeline health map",
+            "status": "complete",
+        },
+        {
+            "step": 2,
+            "agent": "Observability MCP Agent",
+            "action": "Classified recent logs and mapped them to failure type",
+            "status": "complete",
+        },
+        {
+            "step": 3,
+            "agent": "Vector Memory",
+            "action": "Retrieved similar incidents and prior recovery outcomes",
+            "status": "complete",
+        },
+        {
+            "step": 4,
+            "agent": "Kafka/Database/Redis MCP Agent",
+            "action": "Selected component-specific tool based on failure",
+            "status": "complete",
+        },
+        {
+            "step": 5,
+            "agent": "Recovery MCP Agent",
+            "action": "Prepared safe recovery or approval request",
+            "status": "active",
+        },
+        {
+            "step": 6,
+            "agent": "Verifier Agent",
+            "action": "Runs post-action health check before marking recovered",
+            "status": "pending",
+        },
     ]
     return {
         "description": "The platform visualizes MCP as an agent/tool mesh: a coordinator delegates to component-specific operational tool agents.",
@@ -210,11 +303,38 @@ def tool_call_traces() -> Dict[str, Any]:
         )
     if not rows:
         rows = [
-            {"step": 1, "timestamp": _now(), "component": "kafka", "tool": "check_topics", "input": "required_topics", "output": "healthy", "latency_ms": 31},
-            {"step": 2, "timestamp": _now(), "component": "postgres", "tool": "check_tables", "input": "orders/incidents", "output": "healthy", "latency_ms": 44},
-            {"step": 3, "timestamp": _now(), "component": "redis", "tool": "semantic_cache_lookup", "input": "incident_signature", "output": "miss", "latency_ms": 12},
+            {
+                "step": 1,
+                "timestamp": _now(),
+                "component": "kafka",
+                "tool": "check_topics",
+                "input": "required_topics",
+                "output": "healthy",
+                "latency_ms": 31,
+            },
+            {
+                "step": 2,
+                "timestamp": _now(),
+                "component": "postgres",
+                "tool": "check_tables",
+                "input": "orders/incidents",
+                "output": "healthy",
+                "latency_ms": 44,
+            },
+            {
+                "step": 3,
+                "timestamp": _now(),
+                "component": "redis",
+                "tool": "semantic_cache_lookup",
+                "input": "incident_signature",
+                "output": "miss",
+                "latency_ms": 12,
+            },
         ]
-    return {"description": "Tool-call traces show the operational calls made by MCP tools and agent recovery workflows.", "rows": rows}
+    return {
+        "description": "Tool-call traces show the operational calls made by MCP tools and agent recovery workflows.",
+        "rows": rows,
+    }
 
 
 def visualization_charts() -> Dict[str, Any]:
@@ -226,14 +346,41 @@ def visualization_charts() -> Dict[str, Any]:
     semantic = semantic_cache_summary()
     return {
         "stage_health": [
-            {"name": "Healthy", "value": sum(1 for s in stage_map if s.get("color") == "green")},
-            {"name": "Self-healing", "value": sum(1 for s in stage_map if s.get("color") == "yellow")},
-            {"name": "Down", "value": sum(1 for s in stage_map if s.get("color") == "red")},
+            {
+                "name": "Healthy",
+                "value": sum(1 for s in stage_map if s.get("color") == "green"),
+            },
+            {
+                "name": "Self-healing",
+                "value": sum(1 for s in stage_map if s.get("color") == "yellow"),
+            },
+            {
+                "name": "Down",
+                "value": sum(1 for s in stage_map if s.get("color") == "red"),
+            },
         ],
-        "mcp_success": [{"agent": a["agent"].replace(" MCP Agent", ""), "success_rate": round(a["success_rate"] * 100, 1), "latency_ms": a["latency_ms"]} for a in mcp["agents"]],
-        "rag_scores": [{"memory": r["memory_id"], "score": r["similarity_score"] or 0, "rank": r["rank"]} for r in vector["rows"][:8]],
+        "mcp_success": [
+            {
+                "agent": a["agent"].replace(" MCP Agent", ""),
+                "success_rate": round(a["success_rate"] * 100, 1),
+                "latency_ms": a["latency_ms"],
+            }
+            for a in mcp["agents"]
+        ],
+        "rag_scores": [
+            {
+                "memory": r["memory_id"],
+                "score": r["similarity_score"] or 0,
+                "rank": r["rank"],
+            }
+            for r in vector["rows"][:8]
+        ],
         "log_severity": [
-            {"severity": sev, "count": sum(1 for r in logs["rows"] if r["severity"] == sev)} for sev in ["critical", "high", "medium", "low"]
+            {
+                "severity": sev,
+                "count": sum(1 for r in logs["rows"] if r["severity"] == sev),
+            }
+            for sev in ["critical", "high", "medium", "low"]
         ],
         "cache": [
             {"name": "Entries", "value": semantic.get("entries", 0)},

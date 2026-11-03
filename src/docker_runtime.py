@@ -126,7 +126,12 @@ def _recovery_allowed() -> bool:
 
 def start_container(service_or_container: str) -> Dict[str, Any]:
     if not _recovery_allowed():
-        return {"ok": False, "dry_run": True, "service": service_or_container, "reason": "ENABLE_DOCKER_RECOVERY is not true"}
+        return {
+            "ok": False,
+            "dry_run": True,
+            "service": service_or_container,
+            "reason": "ENABLE_DOCKER_RECOVERY is not true",
+        }
     try:
         client = _client()
         last_error = None
@@ -135,17 +140,37 @@ def start_container(service_or_container: str) -> Dict[str, Any]:
                 container = client.containers.get(name)
                 container.start()
                 container.reload()
-                return {"ok": True, "service": service_or_container, "container": name, "status": container.status}
+                return {
+                    "ok": True,
+                    "service": service_or_container,
+                    "container": name,
+                    "status": container.status,
+                }
             except Exception as exc:
                 last_error = str(exc)
-        return {"ok": False, "service": service_or_container, "reason": "container_not_found", "error": last_error}
+        return {
+            "ok": False,
+            "service": service_or_container,
+            "reason": "container_not_found",
+            "error": last_error,
+        }
     except Exception as exc:
-        return {"ok": False, "service": service_or_container, "reason": "docker_start_failed", "error": str(exc)}
+        return {
+            "ok": False,
+            "service": service_or_container,
+            "reason": "docker_start_failed",
+            "error": str(exc),
+        }
 
 
 def restart_container(service_or_container: str) -> Dict[str, Any]:
     if not _recovery_allowed():
-        return {"ok": False, "dry_run": True, "service": service_or_container, "reason": "ENABLE_DOCKER_RECOVERY is not true"}
+        return {
+            "ok": False,
+            "dry_run": True,
+            "service": service_or_container,
+            "reason": "ENABLE_DOCKER_RECOVERY is not true",
+        }
     try:
         client = _client()
         last_error = None
@@ -154,12 +179,27 @@ def restart_container(service_or_container: str) -> Dict[str, Any]:
                 container = client.containers.get(name)
                 container.restart(timeout=15)
                 container.reload()
-                return {"ok": True, "service": service_or_container, "container": name, "status": container.status}
+                return {
+                    "ok": True,
+                    "service": service_or_container,
+                    "container": name,
+                    "status": container.status,
+                }
             except Exception as exc:
                 last_error = str(exc)
-        return {"ok": False, "service": service_or_container, "reason": "container_not_found", "error": last_error}
+        return {
+            "ok": False,
+            "service": service_or_container,
+            "reason": "container_not_found",
+            "error": last_error,
+        }
     except Exception as exc:
-        return {"ok": False, "service": service_or_container, "reason": "docker_restart_failed", "error": str(exc)}
+        return {
+            "ok": False,
+            "service": service_or_container,
+            "reason": "docker_restart_failed",
+            "error": str(exc),
+        }
 
 
 def container_logs(service_or_container: str, tail: int = 120) -> Dict[str, Any]:
@@ -170,9 +210,24 @@ def container_logs(service_or_container: str, tail: int = 120) -> Dict[str, Any]
             try:
                 container = client.containers.get(name)
                 logs = container.logs(tail=tail).decode("utf-8", errors="replace")
-                return {"ok": True, "service": service_or_container, "container": name, "logs": logs[-8000:]}
+                return {
+                    "ok": True,
+                    "service": service_or_container,
+                    "container": name,
+                    "logs": logs[-8000:],
+                }
             except Exception as exc:
                 last_error = str(exc)
-        return {"ok": False, "service": service_or_container, "reason": "container_not_found", "error": last_error}
+        return {
+            "ok": False,
+            "service": service_or_container,
+            "reason": "container_not_found",
+            "error": last_error,
+        }
     except Exception as exc:
-        return {"ok": False, "service": service_or_container, "reason": "docker_logs_failed", "error": str(exc)}
+        return {
+            "ok": False,
+            "service": service_or_container,
+            "reason": "docker_logs_failed",
+            "error": str(exc),
+        }
