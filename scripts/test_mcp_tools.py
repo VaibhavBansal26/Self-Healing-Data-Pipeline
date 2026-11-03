@@ -21,7 +21,12 @@ if __name__ == "__main__":
     print(
         call_pipeline_tool(
             "search_similar_incidents",
-            payload={"event_id": "demo", "customer_id": "c1", "amount": "12.5", "status": "paid"},
+            payload={
+                "event_id": "demo",
+                "customer_id": "c1",
+                "amount": "12.5",
+                "status": "paid",
+            },
             error_message="amount should be a valid number, currency missing",
             k=2,
         )

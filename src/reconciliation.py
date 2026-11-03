@@ -8,11 +8,13 @@ from src.db import count_orders_and_incidents, insert_reconciliation_run
 def get_topic_message_count(topic: str) -> int:
     from confluent_kafka import Consumer, TopicPartition
 
-    consumer = Consumer({
-        "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
-        "group.id": f"reconciliation_counter_{datetime.utcnow().timestamp()}",
-        "enable.auto.commit": False,
-    })
+    consumer = Consumer(
+        {
+            "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
+            "group.id": f"reconciliation_counter_{datetime.utcnow().timestamp()}",
+            "enable.auto.commit": False,
+        }
+    )
     try:
         metadata = consumer.list_topics(topic=topic, timeout=10)
         if topic not in metadata.topics:
@@ -38,7 +40,9 @@ def run_daily_reconciliation() -> str:
         f"Reconciliation completed. orders={orders_count}, "
         f"incidents={incident_count}, dlq={dlq_count}, unresolved={unresolved}"
     )
-    insert_reconciliation_run(orders_count, incident_count, dlq_count, unresolved, notes)
+    insert_reconciliation_run(
+        orders_count, incident_count, dlq_count, unresolved, notes
+    )
     print(notes)
     return notes
 

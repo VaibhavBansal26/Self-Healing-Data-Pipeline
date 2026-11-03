@@ -11,7 +11,10 @@ def _auth_enabled() -> bool:
 
 
 def require_role(required: str):
-    def dependency(x_api_key: str | None = Header(default=None), x_user_role: str | None = Header(default="viewer")) -> str:
+    def dependency(
+        x_api_key: str | None = Header(default=None),
+        x_user_role: str | None = Header(default="viewer"),
+    ) -> str:
         if not _auth_enabled():
             return x_user_role or "demo-admin"
         expected_key = os.getenv("DASHBOARD_API_KEY")
@@ -21,4 +24,5 @@ def require_role(required: str):
         if ROLE_ORDER.get(role, -1) < ROLE_ORDER.get(required, 0):
             raise HTTPException(status_code=403, detail=f"Requires {required} role")
         return role
+
     return dependency

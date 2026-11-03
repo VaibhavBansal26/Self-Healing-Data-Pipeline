@@ -24,6 +24,7 @@ TopicPartition = None
 
 def _redis_client():
     import redis
+
     return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
 
 
@@ -42,7 +43,9 @@ def get_redis_retry_count_tool(fingerprint: str) -> Dict[str, Any]:
     return {"fingerprint": fingerprint, "retry_count": int(value or 0)}
 
 
-def query_recent_incidents_tool(limit: int = 10, status: Optional[str] = None) -> List[Dict[str, Any]]:
+def query_recent_incidents_tool(
+    limit: int = 10, status: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Read recent incidents from PostgreSQL for debugging and agent context."""
     limit = max(1, min(limit, 50))
     params: list[Any] = []
@@ -121,7 +124,11 @@ def peek_dlq_tool(max_messages: int = 5) -> List[Dict[str, Any]]:
     max_messages = max(1, min(max_messages, 20))
     global Consumer, TopicPartition
     if Consumer is None or TopicPartition is None:
-        from confluent_kafka import Consumer as _Consumer, TopicPartition as _TopicPartition
+        from confluent_kafka import (
+            Consumer as _Consumer,
+            TopicPartition as _TopicPartition,
+        )
+
         Consumer = _Consumer
         TopicPartition = _TopicPartition
     consumer = Consumer(
@@ -175,6 +182,7 @@ def replay_dlq_event_tool(
     global Producer
     if Producer is None:
         from confluent_kafka import Producer as _Producer
+
         Producer = _Producer
     producer = Producer({"bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS})
     key = str(payload.get("event_id", "replayed"))
@@ -189,7 +197,12 @@ def replay_dlq_event_tool(
             reviewer_notes=reviewer_notes,
         )
         DLQ_REPLAY_SUCCESS.inc()
-        return {"replayed": True, "target_topic": target_topic, "event_id": payload.get("event_id"), "replay_id": replay_id}
+        return {
+            "replayed": True,
+            "target_topic": target_topic,
+            "event_id": payload.get("event_id"),
+            "replay_id": replay_id,
+        }
     except Exception as exc:
         replay_id = insert_replay_audit(
             original_payload=payload,
@@ -200,7 +213,13 @@ def replay_dlq_event_tool(
             failure_reason=str(exc),
         )
         DLQ_REPLAY_FAILURE.inc()
-        return {"replayed": False, "target_topic": target_topic, "event_id": payload.get("event_id"), "replay_id": replay_id, "error": str(exc)}
+        return {
+            "replayed": False,
+            "target_topic": target_topic,
+            "event_id": payload.get("event_id"),
+            "replay_id": replay_id,
+            "error": str(exc),
+        }
 
 
 def run_reconciliation_tool() -> Dict[str, Any]:

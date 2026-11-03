@@ -5,7 +5,9 @@ def test_demo_catalog_exposes_scenarios():
     catalog = demo_data_description()
     assert "scenarios" in catalog
     assert "amount_string" in catalog["scenarios"]
-    assert set(DEMO_SCENARIOS).issuperset({"valid_order", "negative_amount", "missing_customer"})
+    assert set(DEMO_SCENARIOS).issuperset(
+        {"valid_order", "negative_amount", "missing_customer"}
+    )
 
 
 def test_build_demo_event_amount_string():

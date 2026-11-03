@@ -18,6 +18,7 @@ def trace_span(name: str, **attributes: object) -> Iterator[None]:
         return
     try:
         from opentelemetry import trace
+
         tracer = trace.get_tracer("self_healing_pipeline")
         with tracer.start_as_current_span(name) as span:
             for key, value in attributes.items():
@@ -32,6 +33,7 @@ def setup_fastapi_tracing(app: object) -> None:
         return
     try:
         from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+
         FastAPIInstrumentor.instrument_app(app)  # type: ignore[arg-type]
     except Exception:
         return

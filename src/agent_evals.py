@@ -27,32 +27,42 @@ def evaluate_agents(path: str = "evals/healing_cases.jsonl") -> Dict[str, Any]:
     by_agent: Dict[str, Dict[str, Any]] = {}
     winner_correct = 0
     for case in cases:
-        comparison = compare_agents(case["payload"], case.get("error_message", "validation failed"))
+        comparison = compare_agents(
+            case["payload"], case.get("error_message", "validation failed")
+        )
         expected = case["expected_action"]
         winner = comparison["winner"]
         if winner["action"] == expected:
             winner_correct += 1
         for result in comparison["results"]:
             agent = result["agent_name"]
-            by_agent.setdefault(agent, {"correct": 0, "total": 0, "cost_usd": 0.0, "latency_ms": 0.0})
+            by_agent.setdefault(
+                agent, {"correct": 0, "total": 0, "cost_usd": 0.0, "latency_ms": 0.0}
+            )
             by_agent[agent]["total"] += 1
             by_agent[agent]["cost_usd"] += float(result.get("estimated_cost_usd", 0.0))
             by_agent[agent]["latency_ms"] += float(result.get("latency_ms", 0.0))
             if result["action"] == expected:
                 by_agent[agent]["correct"] += 1
-        rows.append({
-            "case_id": case.get("case_id"),
-            "description": case.get("description"),
-            "expected_action": expected,
-            "winner_action": winner["action"],
-            "winner_agent": winner["agent_name"],
-            "correct": winner["action"] == expected,
-            "comparison": comparison,
-        })
+        rows.append(
+            {
+                "case_id": case.get("case_id"),
+                "description": case.get("description"),
+                "expected_action": expected,
+                "winner_action": winner["action"],
+                "winner_agent": winner["agent_name"],
+                "correct": winner["action"] == expected,
+                "comparison": comparison,
+            }
+        )
     for stats in by_agent.values():
-        stats["accuracy"] = round(stats["correct"] / stats["total"], 4) if stats["total"] else 0.0
+        stats["accuracy"] = (
+            round(stats["correct"] / stats["total"], 4) if stats["total"] else 0.0
+        )
         stats["cost_usd"] = round(stats["cost_usd"], 8)
-        stats["avg_latency_ms"] = round(stats["latency_ms"] / stats["total"], 2) if stats["total"] else 0.0
+        stats["avg_latency_ms"] = (
+            round(stats["latency_ms"] / stats["total"], 2) if stats["total"] else 0.0
+        )
         del stats["latency_ms"]
     return {
         "cases": len(cases),

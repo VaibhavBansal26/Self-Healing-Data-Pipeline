@@ -46,11 +46,16 @@ def _meta(row: Dict[str, Any]) -> Dict[str, Any]:
 
 def log(message: str, **metadata: Any) -> None:
     payload = {"message": message, "auto_heal_enabled": AUTO_HEAL_ENABLED, **metadata}
-    print(f"[auto-healer] {_utc_now()} {message} {json.dumps(metadata, default=str)}", flush=True)
+    print(
+        f"[auto-healer] {_utc_now()} {message} {json.dumps(metadata, default=str)}",
+        flush=True,
+    )
     trace_event("auto_healer", "background_loop", "info", metadata=payload)
 
 
-def _request_json(method: str, path: str, body: Dict[str, Any] | None = None, timeout: int = 20) -> Dict[str, Any]:
+def _request_json(
+    method: str, path: str, body: Dict[str, Any] | None = None, timeout: int = 20
+) -> Dict[str, Any]:
     data = None if body is None else json.dumps(body).encode("utf-8")
     req = urllib.request.Request(
         f"{API_BASE_URL}{path}",
@@ -73,7 +78,10 @@ def _unhealthy_components(health: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def _safe_summary(unhealthy: List[Dict[str, Any]]) -> List[str]:
-    return [f"{c.get('component')}:{c.get('problem_type')}→{c.get('suggested_action')}" for c in unhealthy]
+    return [
+        f"{c.get('component')}:{c.get('problem_type')}→{c.get('suggested_action')}"
+        for c in unhealthy
+    ]
 
 
 def run_once() -> Dict[str, Any]:
@@ -85,13 +93,20 @@ def run_once() -> Dict[str, Any]:
     """
     started = time.time()
     if not AUTO_HEAL_ENABLED:
-        log("Auto-heal is disabled. The background agent is sleeping.", state="disabled")
+        log(
+            "Auto-heal is disabled. The background agent is sleeping.", state="disabled"
+        )
         return {"state": "disabled", "message": "AUTO_HEAL_PIPELINE_STEPS is false"}
 
-    trace_event("auto_healer", "detect", "started", metadata={
-        "message": "I am checking pipeline health in the background.",
-        "api_base_url": API_BASE_URL,
-    })
+    trace_event(
+        "auto_healer",
+        "detect",
+        "started",
+        metadata={
+            "message": "I am checking pipeline health in the background.",
+            "api_base_url": API_BASE_URL,
+        },
+    )
     health = _request_json("GET", "/pipeline/health", timeout=12)
     unhealthy = _unhealthy_components(health)
 
@@ -101,70 +116,141 @@ def run_once() -> Dict[str, Any]:
             "sleep",
             "healthy",
             latency_ms=int((time.time() - started) * 1000),
-            metadata={"message": "All stages healthy. Agent sleeping.", "state": "sleeping"},
+            metadata={
+                "message": "All stages healthy. Agent sleeping.",
+                "state": "sleeping",
+            },
         )
-        log("All monitored stages are healthy. Background agent is sleeping.", state="sleeping")
-        return {"state": "sleeping", "message": "All monitored stages are healthy", "unhealthy": []}
+        log(
+            "All monitored stages are healthy. Background agent is sleeping.",
+            state="sleeping",
+        )
+        return {
+            "state": "sleeping",
+            "message": "All monitored stages are healthy",
+            "unhealthy": [],
+        }
 
     summary = _safe_summary(unhealthy)
-    trace_event("auto_healer", "detect", "unhealthy_detected", metadata={
-        "state": "detecting",
-        "message": "I found an unhealthy pipeline stage and I am preparing a safe recovery plan.",
-        "unhealthy": unhealthy,
-        "summary": summary,
-    })
-    trace_event("auto_healer", "plan", "agent_active", metadata={
-        "state": "planning",
-        "message": "I am using policy, previous recovery memory, MCP context, and health signals to decide the next action.",
-        "summary": summary,
-        "demo_delay_seconds": DEMO_DELAY_SECONDS,
-    })
-    log("Detected unhealthy stages. Starting safe auto-heal.", state="healing", unhealthy=summary)
+    trace_event(
+        "auto_healer",
+        "detect",
+        "unhealthy_detected",
+        metadata={
+            "state": "detecting",
+            "message": "I found an unhealthy pipeline stage and I am preparing a safe recovery plan.",
+            "unhealthy": unhealthy,
+            "summary": summary,
+        },
+    )
+    trace_event(
+        "auto_healer",
+        "plan",
+        "agent_active",
+        metadata={
+            "state": "planning",
+            "message": "I am using policy, previous recovery memory, MCP context, and health signals to decide the next action.",
+            "summary": summary,
+            "demo_delay_seconds": DEMO_DELAY_SECONDS,
+        },
+    )
+    log(
+        "Detected unhealthy stages. Starting safe auto-heal.",
+        state="healing",
+        unhealthy=summary,
+    )
 
     if DEMO_DELAY_SECONDS > 0:
-        trace_event("auto_healer", "visible_delay", "waiting_before_heal", metadata={
-            "state": "healing_visible_delay",
-            "message": f"I am holding the healing state for {DEMO_DELAY_SECONDS} seconds so the UI can show what is happening.",
-            "summary": summary,
-        })
+        trace_event(
+            "auto_healer",
+            "visible_delay",
+            "waiting_before_heal",
+            metadata={
+                "state": "healing_visible_delay",
+                "message": f"I am holding the healing state for {DEMO_DELAY_SECONDS} seconds so the UI can show what is happening.",
+                "summary": summary,
+            },
+        )
         time.sleep(DEMO_DELAY_SECONDS)
 
-    trace_event("auto_healer", "heal", "started", metadata={
-        "state": "healing",
-        "message": "I am now executing safe allowlisted recovery through /pipeline/heal.",
-        "actions": summary,
-    })
+    trace_event(
+        "auto_healer",
+        "heal",
+        "started",
+        metadata={
+            "state": "healing",
+            "message": "I am now executing safe allowlisted recovery through /pipeline/heal.",
+            "actions": summary,
+        },
+    )
     heal = _request_json("POST", "/pipeline/heal", timeout=45)
-    trace_event("auto_healer", "heal", "completed", latency_ms=int((time.time() - started) * 1000), metadata={
-        "state": "healing_completed",
-        "message": "The recovery command finished. I am verifying the pipeline state now.",
-        "response": heal,
-        "summary": summary,
-    })
+    trace_event(
+        "auto_healer",
+        "heal",
+        "completed",
+        latency_ms=int((time.time() - started) * 1000),
+        metadata={
+            "state": "healing_completed",
+            "message": "The recovery command finished. I am verifying the pipeline state now.",
+            "response": heal,
+            "summary": summary,
+        },
+    )
 
     verify = _request_json("GET", "/pipeline/health", timeout=12)
     still_unhealthy = _unhealthy_components(verify)
     final_state = "recovered" if not still_unhealthy else "needs_attention"
-    trace_event("auto_healer", "verify", final_state, latency_ms=int((time.time() - started) * 1000), metadata={
-        "state": final_state,
-        "message": "Recovery verified. The affected stages are healthy again." if final_state == "recovered" else "Some stages still need attention or approval.",
-        "initial_unhealthy_summary": summary,
-        "remaining_unhealthy": still_unhealthy,
-        "hold_seconds": VISIBILITY_HOLD_SECONDS,
-    })
-    trace_event("auto_healer", "ui_latch", "recently_recovered" if final_state == "recovered" else "recently_attention", metadata={
-        "state": "recently_recovered" if final_state == "recovered" else "needs_attention",
-        "message": "I just completed an automatic safe recovery. This event will stay visible briefly even though the live map is green again." if final_state == "recovered" else "I attempted recovery, but some stages still need attention.",
-        "initial_unhealthy_summary": summary,
-        "remaining_unhealthy": still_unhealthy,
-        "hold_seconds": VISIBILITY_HOLD_SECONDS,
-        "cycle_latency_ms": int((time.time() - started) * 1000),
-    })
-    log("Auto-heal cycle finished.", state=final_state, remaining=[c.get("component") for c in still_unhealthy])
+    trace_event(
+        "auto_healer",
+        "verify",
+        final_state,
+        latency_ms=int((time.time() - started) * 1000),
+        metadata={
+            "state": final_state,
+            "message": (
+                "Recovery verified. The affected stages are healthy again."
+                if final_state == "recovered"
+                else "Some stages still need attention or approval."
+            ),
+            "initial_unhealthy_summary": summary,
+            "remaining_unhealthy": still_unhealthy,
+            "hold_seconds": VISIBILITY_HOLD_SECONDS,
+        },
+    )
+    trace_event(
+        "auto_healer",
+        "ui_latch",
+        "recently_recovered" if final_state == "recovered" else "recently_attention",
+        metadata={
+            "state": (
+                "recently_recovered"
+                if final_state == "recovered"
+                else "needs_attention"
+            ),
+            "message": (
+                "I just completed an automatic safe recovery. This event will stay visible briefly even though the live map is green again."
+                if final_state == "recovered"
+                else "I attempted recovery, but some stages still need attention."
+            ),
+            "initial_unhealthy_summary": summary,
+            "remaining_unhealthy": still_unhealthy,
+            "hold_seconds": VISIBILITY_HOLD_SECONDS,
+            "cycle_latency_ms": int((time.time() - started) * 1000),
+        },
+    )
+    log(
+        "Auto-heal cycle finished.",
+        state=final_state,
+        remaining=[c.get("component") for c in still_unhealthy],
+    )
 
     return {
         "state": final_state,
-        "message": "Safe auto-heal cycle completed" if final_state == "recovered" else "Some stages still need attention or approval",
+        "message": (
+            "Safe auto-heal cycle completed"
+            if final_state == "recovered"
+            else "Some stages still need attention or approval"
+        ),
         "initial_unhealthy": unhealthy,
         "heal_response": heal,
         "final_health": verify,
@@ -185,53 +271,114 @@ def main() -> None:
         try:
             run_once()
         except urllib.error.URLError as exc:
-            trace_event("auto_healer", "background_loop", "api_unavailable", metadata={"error": str(exc), "api_base_url": API_BASE_URL, "state": "api_unavailable"})
+            trace_event(
+                "auto_healer",
+                "background_loop",
+                "api_unavailable",
+                metadata={
+                    "error": str(exc),
+                    "api_base_url": API_BASE_URL,
+                    "state": "api_unavailable",
+                },
+            )
             print(f"[auto-healer] {_utc_now()} API unavailable: {exc}", flush=True)
         except Exception as exc:
-            trace_event("auto_healer", "background_loop", "error", metadata={"error": str(exc), "state": "error"})
+            trace_event(
+                "auto_healer",
+                "background_loop",
+                "error",
+                metadata={"error": str(exc), "state": "error"},
+            )
             print(f"[auto-healer] {_utc_now()} error: {exc}", flush=True)
         time.sleep(INTERVAL_SECONDS)
 
 
 def auto_healer_status(limit: int = 80) -> Dict[str, Any]:
-    traces = [t for t in list_trace_events(limit=limit * 4) if t.get("trace_name") == "auto_healer"][:limit]
+    traces = [
+        t
+        for t in list_trace_events(limit=limit * 4)
+        if t.get("trace_name") == "auto_healer"
+    ][:limit]
     latest = traces[0] if traces else None
     now = datetime.now(timezone.utc)
 
     # Prefer a recent active/recovery cycle over a later "sleep" trace so the UI
     # does not miss fast recoveries.
     active_statuses = {
-        "unhealthy_detected", "agent_active", "waiting_before_heal", "started", "completed",
-        "recovered", "needs_attention", "recently_recovered", "recently_attention",
+        "unhealthy_detected",
+        "agent_active",
+        "waiting_before_heal",
+        "started",
+        "completed",
+        "recovered",
+        "needs_attention",
+        "recently_recovered",
+        "recently_attention",
     }
     recent_cycle = []
     recent_recovery = None
     for row in traces:
         created = _parse_dt(row.get("created_at"))
         if created and now - created <= timedelta(seconds=VISIBILITY_HOLD_SECONDS):
-            if row.get("stage") in {"detect", "plan", "visible_delay", "heal", "verify", "ui_latch"} or row.get("status") in active_statuses:
+            if (
+                row.get("stage")
+                in {"detect", "plan", "visible_delay", "heal", "verify", "ui_latch"}
+                or row.get("status") in active_statuses
+            ):
                 recent_cycle.append(row)
-                if row.get("status") in {"recovered", "recently_recovered", "needs_attention", "recently_attention"}:
-                    recent_recovery = row if recent_recovery is None else recent_recovery
+                if row.get("status") in {
+                    "recovered",
+                    "recently_recovered",
+                    "needs_attention",
+                    "recently_attention",
+                }:
+                    recent_recovery = (
+                        row if recent_recovery is None else recent_recovery
+                    )
 
     latest_meta = _meta(latest) if latest else {}
     active_meta = _meta(recent_cycle[0]) if recent_cycle else latest_meta
 
     if recent_cycle:
         statuses = {r.get("status") for r in recent_cycle[:6]}
-        if "waiting_before_heal" in statuses or "started" in statuses or "agent_active" in statuses or "unhealthy_detected" in statuses:
+        if (
+            "waiting_before_heal" in statuses
+            or "started" in statuses
+            or "agent_active" in statuses
+            or "unhealthy_detected" in statuses
+        ):
             state = "healing_visible"
-            latest_message = active_meta.get("message") or "The background agent is actively detecting, planning, or healing."
+            latest_message = (
+                active_meta.get("message")
+                or "The background agent is actively detecting, planning, or healing."
+            )
         elif recent_recovery:
             recovery_meta = _meta(recent_recovery)
-            state = recovery_meta.get("state") or recent_recovery.get("status") or "recently_recovered"
-            latest_message = recovery_meta.get("message") or "The background agent recently completed a recovery."
+            state = (
+                recovery_meta.get("state")
+                or recent_recovery.get("status")
+                or "recently_recovered"
+            )
+            latest_message = (
+                recovery_meta.get("message")
+                or "The background agent recently completed a recovery."
+            )
         else:
             state = active_meta.get("state") or "recent_activity"
-            latest_message = active_meta.get("message") or "Recent background auto-healer activity is available."
+            latest_message = (
+                active_meta.get("message")
+                or "Recent background auto-healer activity is available."
+            )
     else:
-        state = latest_meta.get("state") or (latest or {}).get("status") or "waiting_for_first_cycle"
-        latest_message = latest_meta.get("message") or "Waiting for the background auto-healer to write its first trace."
+        state = (
+            latest_meta.get("state")
+            or (latest or {}).get("status")
+            or "waiting_for_first_cycle"
+        )
+        latest_message = (
+            latest_meta.get("message")
+            or "Waiting for the background auto-healer to write its first trace."
+        )
 
     return {
         "enabled": AUTO_HEAL_ENABLED,

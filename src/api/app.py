@@ -7,16 +7,40 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from src.dashboard_service import (
-    get_pipeline_summary, get_consumer_state, set_consumer_paused, list_incidents,
-    list_orders, get_agent_decision_traces, list_reconciliation_runs, update_incident_status,
-    run_reconciliation_now, peek_dlq, replay_payload_to_raw_topic
+    get_pipeline_summary,
+    get_consumer_state,
+    set_consumer_paused,
+    list_incidents,
+    list_orders,
+    get_agent_decision_traces,
+    list_reconciliation_runs,
+    update_incident_status,
+    run_reconciliation_now,
+    peek_dlq,
+    replay_payload_to_raw_topic,
 )
-from src.data_catalog import demo_data_description, demo_order_events, build_demo_event, pressure_test_events
+from src.data_catalog import (
+    demo_data_description,
+    demo_order_events,
+    build_demo_event,
+    pressure_test_events,
+)
 from src.event_gateway import publish_event, publish_events, publish_demo_events
 from src.transformations import transform_order_payload, transform_many
-from src.pipeline_health import get_pipeline_health, heal_safe_pipeline_steps, heal_pipeline_component, recent_pipeline_step_incidents
+from src.pipeline_health import (
+    get_pipeline_health,
+    heal_safe_pipeline_steps,
+    heal_pipeline_component,
+    recent_pipeline_step_incidents,
+)
 from src.failure_simulator import scenarios as failure_scenarios, run_failure_simulation
-from src.dashboard_service import list_event_journey, list_replay_audit, list_schema_versions, pressure_test_summary, rag_evidence
+from src.dashboard_service import (
+    list_event_journey,
+    list_replay_audit,
+    list_schema_versions,
+    pressure_test_summary,
+    rag_evidence,
+)
 from src.api.auth import require_role
 from src.kafka_lag import get_consumer_lag
 from src.tracing import setup_fastapi_tracing
@@ -31,7 +55,10 @@ from src.pipeline_learning import action_success_summary
 from src.pipeline_metrics import pipeline_healing_metrics
 from src.trace_events import list_trace_events
 
-from src.prompt_injection_defense import prompt_injection_test_suite, build_safe_llm_context
+from src.prompt_injection_defense import (
+    prompt_injection_test_suite,
+    build_safe_llm_context,
+)
 from src.semantic_cache import semantic_cache_summary, semantic_cache_demo
 from src.retrieval_eval import evaluate_retrieval
 from src.tool_use_eval import evaluate_tool_use
@@ -99,8 +126,6 @@ def health() -> Dict[str, str]:
     return {"status": "ok"}
 
 
-
-
 @app.get("/kafka/lag")
 def kafka_lag() -> Dict[str, Any]:
     """Expose consumer lag for the React Metrics tab and Prometheus/Grafana troubleshooting."""
@@ -134,7 +159,6 @@ def ai_coverage() -> Dict[str, Any]:
     }
 
 
-
 @app.get("/ai/langsmith/status")
 def ai_langsmith_status() -> Dict[str, Any]:
     return langsmith_status()
@@ -151,7 +175,9 @@ def ai_evals() -> Dict[str, Any]:
 
 
 @app.post("/ai/multi-agent/compare")
-def ai_multi_agent_compare(request: EventRequest, error_message: str = "validation failed") -> Dict[str, Any]:
+def ai_multi_agent_compare(
+    request: EventRequest, error_message: str = "validation failed"
+) -> Dict[str, Any]:
     return compare_agents(request.payload, error_message=error_message)
 
 
@@ -161,7 +187,9 @@ def ai_prompt_injection_suite() -> Dict[str, Any]:
 
 
 @app.post("/ai/security/safe-context")
-def ai_safe_context(request: EventRequest, error_message: str = "validation failed") -> Dict[str, Any]:
+def ai_safe_context(
+    request: EventRequest, error_message: str = "validation failed"
+) -> Dict[str, Any]:
     return build_safe_llm_context(request.payload, error_message)
 
 
@@ -192,12 +220,17 @@ def ai_ops_observatory_endpoint() -> Dict[str, Any]:
 
 @app.get("/ai/trajectory")
 def ai_trajectory(limit: int = Query(default=50, ge=1, le=200)) -> Dict[str, Any]:
-    return build_agent_trajectory(get_pipeline_health(), list_trace_events(limit=limit), limit=limit)
+    return build_agent_trajectory(
+        get_pipeline_health(), list_trace_events(limit=limit), limit=limit
+    )
 
 
 @app.get("/auto-healer/status")
-def auto_healer_status_endpoint(limit: int = Query(default=50, ge=1, le=200)) -> Dict[str, Any]:
+def auto_healer_status_endpoint(
+    limit: int = Query(default=50, ge=1, le=200)
+) -> Dict[str, Any]:
     return auto_healer_status(limit=limit)
+
 
 @app.get("/data/catalog")
 def data_catalog() -> Dict[str, Any]:
@@ -257,7 +290,9 @@ def get_test_event(scenario: str) -> Dict[str, Any]:
 
 @app.post("/events/test/{scenario}")
 def send_test_event(scenario: str, transform: bool = False) -> Dict[str, Any]:
-    return publish_event(build_demo_event(scenario=scenario, prefix="api"), transform=transform)
+    return publish_event(
+        build_demo_event(scenario=scenario, prefix="api"), transform=transform
+    )
 
 
 class IncidentStatusRequest(BaseModel):
@@ -294,7 +329,11 @@ def agent_traces(
 
 
 @app.post("/incidents/{incident_id}/status")
-def incident_status(incident_id: int, request: IncidentStatusRequest, role: str = Depends(require_role("operator"))) -> Dict[str, Any]:
+def incident_status(
+    incident_id: int,
+    request: IncidentStatusRequest,
+    role: str = Depends(require_role("operator")),
+) -> Dict[str, Any]:
     return update_incident_status(incident_id, request.status, request.reviewer_notes)
 
 
@@ -304,22 +343,32 @@ def dlq_peek(max_messages: int = Query(default=5, ge=1, le=20)) -> List[Dict[str
 
 
 @app.post("/dlq/replay")
-def dlq_replay(request: ReplayRequest, role: str = Depends(require_role("admin"))) -> Dict[str, Any]:
-    return replay_payload_to_raw_topic(request.payload, target_topic=request.target_topic)
+def dlq_replay(
+    request: ReplayRequest, role: str = Depends(require_role("admin"))
+) -> Dict[str, Any]:
+    return replay_payload_to_raw_topic(
+        request.payload, target_topic=request.target_topic
+    )
 
 
 @app.get("/reconciliation/runs")
-def reconciliation_runs(limit: int = Query(default=20, ge=1, le=100)) -> List[Dict[str, Any]]:
+def reconciliation_runs(
+    limit: int = Query(default=20, ge=1, le=100)
+) -> List[Dict[str, Any]]:
     return list_reconciliation_runs(limit=limit)
 
 
 @app.post("/reconciliation/run")
-def reconciliation_run_now(role: str = Depends(require_role("admin"))) -> Dict[str, Any]:
+def reconciliation_run_now(
+    role: str = Depends(require_role("admin")),
+) -> Dict[str, Any]:
     return run_reconciliation_now()
 
 
 @app.post("/events/pressure-test")
-def send_pressure_test(total: int = Query(default=1000, ge=1, le=100000)) -> Dict[str, Any]:
+def send_pressure_test(
+    total: int = Query(default=1000, ge=1, le=100000)
+) -> Dict[str, Any]:
     """Publish a mixed pressure test dataset with valid, healable, manual review, and DLQ records."""
     events = pressure_test_events(total=total)
     result = publish_events(events, transform=False)
@@ -339,23 +388,85 @@ def live_flow() -> Dict[str, Any]:
     summary = get_pipeline_summary()
     return {
         "nodes": [
-            {"id": "kafka", "label": "Kafka raw_orders", "count": summary.get("orders_count", 0) + summary.get("incident_count", 0)},
-            {"id": "postgres", "label": "PostgreSQL orders", "count": summary.get("orders_count", 0)},
-            {"id": "agent", "label": "LangGraph Agent", "count": summary.get("incident_count", 0)},
-            {"id": "healed", "label": "Agent healed", "count": summary.get("healed_count", 0)},
-            {"id": "human", "label": "Human approval pending", "count": summary.get("manual_review_count", 0)},
-            {"id": "dlq", "label": "DLQ quarantined", "count": summary.get("dlq_count", 0)},
+            {
+                "id": "kafka",
+                "label": "Kafka raw_orders",
+                "count": summary.get("orders_count", 0)
+                + summary.get("incident_count", 0),
+            },
+            {
+                "id": "postgres",
+                "label": "PostgreSQL orders",
+                "count": summary.get("orders_count", 0),
+            },
+            {
+                "id": "agent",
+                "label": "LangGraph Agent",
+                "count": summary.get("incident_count", 0),
+            },
+            {
+                "id": "healed",
+                "label": "Agent healed",
+                "count": summary.get("healed_count", 0),
+            },
+            {
+                "id": "human",
+                "label": "Human approval pending",
+                "count": summary.get("manual_review_count", 0),
+            },
+            {
+                "id": "dlq",
+                "label": "DLQ quarantined",
+                "count": summary.get("dlq_count", 0),
+            },
         ],
         "edges": [
-            {"from": "kafka", "to": "postgres", "label": "clean insert", "count": summary.get("orders_count", 0)},
-            {"from": "kafka", "to": "agent", "label": "validation failed", "count": summary.get("incident_count", 0)},
-            {"from": "agent", "to": "healed", "label": "reason act verify passed", "count": summary.get("healed_count", 0)},
-            {"from": "agent", "to": "human", "label": "risk gate", "count": summary.get("manual_review_count", 0)},
-            {"from": "agent", "to": "dlq", "label": "quarantine", "count": summary.get("dlq_count", 0)},
+            {
+                "from": "kafka",
+                "to": "postgres",
+                "label": "clean insert",
+                "count": summary.get("orders_count", 0),
+            },
+            {
+                "from": "kafka",
+                "to": "agent",
+                "label": "validation failed",
+                "count": summary.get("incident_count", 0),
+            },
+            {
+                "from": "agent",
+                "to": "healed",
+                "label": "reason act verify passed",
+                "count": summary.get("healed_count", 0),
+            },
+            {
+                "from": "agent",
+                "to": "human",
+                "label": "risk gate",
+                "count": summary.get("manual_review_count", 0),
+            },
+            {
+                "from": "agent",
+                "to": "dlq",
+                "label": "quarantine",
+                "count": summary.get("dlq_count", 0),
+            },
         ],
         "risk_metrics": {
-            "low_risk_healed": len([i for i in list_incidents(limit=200, status="healed") if i.get("risk_level") == "low"]),
-            "high_risk_manual_review": len([i for i in list_incidents(limit=200, status="manual_review") if i.get("risk_level") == "high"]),
+            "low_risk_healed": len(
+                [
+                    i
+                    for i in list_incidents(limit=200, status="healed")
+                    if i.get("risk_level") == "low"
+                ]
+            ),
+            "high_risk_manual_review": len(
+                [
+                    i
+                    for i in list_incidents(limit=200, status="manual_review")
+                    if i.get("risk_level") == "high"
+                ]
+            ),
             "failed_or_dlq": summary.get("failed_count", 0),
         },
     }
@@ -370,7 +481,7 @@ def demo_queries() -> Dict[str, Any]:
         "human_approval_queue": "SELECT incident_id, event_id, error_message, original_payload, healing_action, risk_level FROM pipeline_incidents WHERE status = 'manual_review' ORDER BY created_at DESC;",
         "failed_or_dlq_records": "SELECT incident_id, event_id, error_message, original_payload, healing_action, status FROM pipeline_incidents WHERE status = 'failed' ORDER BY created_at DESC;",
         "risk_summary": "SELECT COALESCE(risk_level, 'unknown') AS risk_level, status, COUNT(*) FROM pipeline_incidents GROUP BY risk_level, status ORDER BY risk_level, status;",
-        "agent_actions": "SELECT healing_action, status, COUNT(*) FROM pipeline_incidents GROUP BY healing_action, status ORDER BY healing_action, status;"
+        "agent_actions": "SELECT healing_action, status, COUNT(*) FROM pipeline_incidents GROUP BY healing_action, status ORDER BY healing_action, status;",
     }
 
 
@@ -378,36 +489,43 @@ def demo_queries() -> Dict[str, Any]:
 def action_logs(limit: int = Query(default=100, ge=1, le=250)) -> List[Dict[str, Any]]:
     rows: List[Dict[str, Any]] = []
     for inc in list_incidents(limit=limit):
-        rows.append({
-            "time": inc.get("created_at"),
-            "type": "record_incident",
-            "event_id": inc.get("event_id"),
-            "component": "record_validation",
-            "problem": inc.get("error_type"),
-            "reason": inc.get("error_message"),
-            "action": inc.get("healing_action") or "manual_review_or_dlq",
-            "risk_level": inc.get("risk_level"),
-            "status": inc.get("status"),
-        })
+        rows.append(
+            {
+                "time": inc.get("created_at"),
+                "type": "record_incident",
+                "event_id": inc.get("event_id"),
+                "component": "record_validation",
+                "problem": inc.get("error_type"),
+                "reason": inc.get("error_message"),
+                "action": inc.get("healing_action") or "manual_review_or_dlq",
+                "risk_level": inc.get("risk_level"),
+                "status": inc.get("status"),
+            }
+        )
     for inc in recent_pipeline_step_incidents(limit=limit):
-        rows.append({
-            "time": inc.get("created_at"),
-            "type": "pipeline_step_incident",
-            "event_id": inc.get("component"),
-            "component": inc.get("component"),
-            "problem": inc.get("problem_type"),
-            "reason": inc.get("reason"),
-            "action": inc.get("recovery_action") or "detect_only",
-            "risk_level": inc.get("risk_level"),
-            "status": inc.get("status"),
-        })
+        rows.append(
+            {
+                "time": inc.get("created_at"),
+                "type": "pipeline_step_incident",
+                "event_id": inc.get("component"),
+                "component": inc.get("component"),
+                "problem": inc.get("problem_type"),
+                "reason": inc.get("reason"),
+                "action": inc.get("recovery_action") or "detect_only",
+                "risk_level": inc.get("risk_level"),
+                "status": inc.get("status"),
+            }
+        )
     rows.sort(key=lambda r: r.get("time") or "", reverse=True)
     return rows[:limit]
 
 
 @app.post("/rag/search")
-def rag_search(request: EventRequest, error_message: str = "manual dashboard search") -> Dict[str, Any]:
+def rag_search(
+    request: EventRequest, error_message: str = "manual dashboard search"
+) -> Dict[str, Any]:
     from src.mcp_layer.tool_client import call_pipeline_tool
+
     similar = call_pipeline_tool(
         "search_similar_incidents",
         payload=request.payload,
@@ -425,7 +543,11 @@ def architecture_journey() -> Dict[str, Any]:
             {"id": "kafka", "label": "Kafka raw_orders", "type": "stream"},
             {"id": "consumer", "label": "Python Consumer", "type": "service"},
             {"id": "transform", "label": "Transformation Layer", "type": "logic"},
-            {"id": "validate", "label": "Schema + Business Validation", "type": "quality"},
+            {
+                "id": "validate",
+                "label": "Schema + Business Validation",
+                "type": "quality",
+            },
             {"id": "postgres", "label": "PostgreSQL orders", "type": "sink"},
             {"id": "agent", "label": "LangGraph Healing Agent", "type": "ai"},
             {"id": "rag", "label": "RAG / Vector Incident Memory", "type": "memory"},
@@ -435,11 +557,21 @@ def architecture_journey() -> Dict[str, Any]:
             {"id": "metrics", "label": "Prometheus Metrics", "type": "observability"},
         ],
         "edges": [
-            ["producer", "kafka"], ["kafka", "consumer"], ["consumer", "transform"],
-            ["transform", "validate"], ["validate", "postgres"], ["validate", "agent"],
-            ["agent", "rag"], ["rag", "agent"], ["agent", "postgres"],
-            ["agent", "approval"], ["approval", "kafka"], ["agent", "dlq"],
-            ["dlq", "airflow"], ["postgres", "airflow"], ["consumer", "metrics"],
+            ["producer", "kafka"],
+            ["kafka", "consumer"],
+            ["consumer", "transform"],
+            ["transform", "validate"],
+            ["validate", "postgres"],
+            ["validate", "agent"],
+            ["agent", "rag"],
+            ["rag", "agent"],
+            ["agent", "postgres"],
+            ["agent", "approval"],
+            ["approval", "kafka"],
+            ["agent", "dlq"],
+            ["dlq", "airflow"],
+            ["postgres", "airflow"],
+            ["consumer", "metrics"],
         ],
     }
 
@@ -455,21 +587,25 @@ def pipeline_heal_safe() -> Dict[str, Any]:
     """Auto heal only safe pipeline step problems and log risky ones for human approval."""
     return heal_safe_pipeline_steps()
 
+
 @app.post("/pipeline/heal")
 def pipeline_heal() -> Dict[str, Any]:
     """Convenience alias used by the UI/demo to auto-heal safe pipeline step problems."""
     return heal_safe_pipeline_steps()
 
 
-
 @app.post("/pipeline/heal/component")
 def pipeline_heal_component(request: PipelineHealRequest) -> Dict[str, Any]:
     """Heal one pipeline component with an allowlisted recovery action."""
-    return heal_pipeline_component(request.component, request.action, request.approve_risky)
+    return heal_pipeline_component(
+        request.component, request.action, request.approve_risky
+    )
 
 
 @app.get("/pipeline/incidents")
-def pipeline_incidents(limit: int = Query(default=50, ge=1, le=250), status: str = "all") -> List[Dict[str, Any]]:
+def pipeline_incidents(
+    limit: int = Query(default=50, ge=1, le=250), status: str = "all"
+) -> List[Dict[str, Any]]:
     return recent_pipeline_step_incidents(limit=limit, status=status)
 
 
@@ -493,14 +629,58 @@ def pipeline_system_design() -> Dict[str, Any]:
             "Agent verifies component health again after recovery",
         ],
         "components": [
-            {"component": "Kafka", "breaks_when": "topic missing, broker unavailable, lag high", "safe_actions": ["create missing topic", "route to DLQ", "request approval for offset reset"]},
-            {"component": "Consumer", "breaks_when": "paused, crashed, poison message, missing secret", "safe_actions": ["resume consumer", "fallback mode", "manual review"]},
-            {"component": "PostgreSQL", "breaks_when": "down, missing table, constraint conflict", "safe_actions": ["pause consumer", "run approved migration", "staging table"]},
-            {"component": "Redis", "breaks_when": "unavailable, state lost", "safe_actions": ["continue without retry memory", "reconnect"]},
-            {"component": "OpenAI", "breaks_when": "missing key, timeout, rate limit", "safe_actions": ["deterministic fallback", "manual review"]},
-            {"component": "Airflow", "breaks_when": "DAG failed, stale reconciliation", "safe_actions": ["run reconciliation", "backfill"]},
-            {"component": "Recovery adapters", "breaks_when": "operator tooling unavailable", "safe_actions": ["dry run action", "request approval", "escalate alert"]},
-            {"component": "Log diagnoser", "breaks_when": "unknown error pattern", "safe_actions": ["classify logs", "show evidence", "ask human"]},
+            {
+                "component": "Kafka",
+                "breaks_when": "topic missing, broker unavailable, lag high",
+                "safe_actions": [
+                    "create missing topic",
+                    "route to DLQ",
+                    "request approval for offset reset",
+                ],
+            },
+            {
+                "component": "Consumer",
+                "breaks_when": "paused, crashed, poison message, missing secret",
+                "safe_actions": ["resume consumer", "fallback mode", "manual review"],
+            },
+            {
+                "component": "PostgreSQL",
+                "breaks_when": "down, missing table, constraint conflict",
+                "safe_actions": [
+                    "pause consumer",
+                    "run approved migration",
+                    "staging table",
+                ],
+            },
+            {
+                "component": "Redis",
+                "breaks_when": "unavailable, state lost",
+                "safe_actions": ["continue without retry memory", "reconnect"],
+            },
+            {
+                "component": "OpenAI",
+                "breaks_when": "missing key, timeout, rate limit",
+                "safe_actions": ["deterministic fallback", "manual review"],
+            },
+            {
+                "component": "Airflow",
+                "breaks_when": "DAG failed, stale reconciliation",
+                "safe_actions": ["run reconciliation", "backfill"],
+            },
+            {
+                "component": "Recovery adapters",
+                "breaks_when": "operator tooling unavailable",
+                "safe_actions": [
+                    "dry run action",
+                    "request approval",
+                    "escalate alert",
+                ],
+            },
+            {
+                "component": "Log diagnoser",
+                "breaks_when": "unknown error pattern",
+                "safe_actions": ["classify logs", "show evidence", "ask human"],
+            },
         ],
     }
 
@@ -511,28 +691,46 @@ def pipeline_metrics_endpoint() -> Dict[str, Any]:
 
 
 @app.get("/pipeline/recovery-memory")
-def recovery_memory(component: str | None = None, problem_type: str | None = None) -> Dict[str, Any]:
+def recovery_memory(
+    component: str | None = None, problem_type: str | None = None
+) -> Dict[str, Any]:
     return action_success_summary(component=component, problem_type=problem_type)
 
 
 @app.get("/pipeline/approvals")
-def pipeline_approvals(limit: int = Query(default=100, ge=1, le=250), status: str = "all") -> List[Dict[str, Any]]:
+def pipeline_approvals(
+    limit: int = Query(default=100, ge=1, le=250), status: str = "all"
+) -> List[Dict[str, Any]]:
     return list_approval_requests(limit=limit, status=status)
 
 
 @app.post("/pipeline/approvals/{approval_id}/decision")
-def pipeline_approval_decision(approval_id: int, request: ApprovalDecisionRequest, role: str = Depends(require_role("operator"))) -> Dict[str, Any]:
-    return decide_approval(approval_id, request.status, request.reviewer, request.reviewer_notes)
+def pipeline_approval_decision(
+    approval_id: int,
+    request: ApprovalDecisionRequest,
+    role: str = Depends(require_role("operator")),
+) -> Dict[str, Any]:
+    return decide_approval(
+        approval_id, request.status, request.reviewer, request.reviewer_notes
+    )
 
 
 @app.get("/pipeline/alerts")
-def pipeline_alerts(limit: int = Query(default=50, ge=1, le=250)) -> List[Dict[str, Any]]:
+def pipeline_alerts(
+    limit: int = Query(default=50, ge=1, le=250)
+) -> List[Dict[str, Any]]:
     return list_alerts(limit=limit)
 
 
 @app.post("/pipeline/alerts")
 def pipeline_send_alert(request: AlertRequest) -> Dict[str, Any]:
-    return send_alert(request.component, request.severity, request.message, request.metadata, request.channel)
+    return send_alert(
+        request.component,
+        request.severity,
+        request.message,
+        request.metadata,
+        request.channel,
+    )
 
 
 @app.post("/pipeline/log-diagnosis")
@@ -543,7 +741,9 @@ def pipeline_log_diagnosis(request: LogDiagnosisRequest) -> Dict[str, Any]:
 
 
 @app.get("/pipeline/traces")
-def pipeline_traces(limit: int = Query(default=100, ge=1, le=500)) -> List[Dict[str, Any]]:
+def pipeline_traces(
+    limit: int = Query(default=100, ge=1, le=500)
+) -> List[Dict[str, Any]]:
     return list_trace_events(limit=limit)
 
 
@@ -558,7 +758,9 @@ def run_failure(request: FailureSimulationRequest) -> Dict[str, Any]:
 
 
 @app.get("/event-journey")
-def event_journey(limit: int = Query(default=200, ge=1, le=1000), event_id: str | None = None) -> List[Dict[str, Any]]:
+def event_journey(
+    limit: int = Query(default=200, ge=1, le=1000), event_id: str | None = None
+) -> List[Dict[str, Any]]:
     return list_event_journey(limit=limit, event_id=event_id)
 
 
@@ -573,9 +775,23 @@ def schema_evolution() -> Dict[str, Any]:
         "supported_versions": list_schema_versions(),
         "policy": "v2 payloads are normalized to the v1 sink contract. Unsupported versions route through Reason -> Act -> Verify and usually go to manual review or DLQ.",
         "examples": {
-            "v1": {"event_id":"evt_1","customer_id":"cust_1","amount":49.99,"currency":"USD","status":"paid","schema_version":1},
-            "v2": {"event_id":"evt_2","customer_id":"cust_1","amount_cents":4999,"currency":"USD","order_state":"PAID","schema_version":2},
-        }
+            "v1": {
+                "event_id": "evt_1",
+                "customer_id": "cust_1",
+                "amount": 49.99,
+                "currency": "USD",
+                "status": "paid",
+                "schema_version": 1,
+            },
+            "v2": {
+                "event_id": "evt_2",
+                "customer_id": "cust_1",
+                "amount_cents": 4999,
+                "currency": "USD",
+                "order_state": "PAID",
+                "schema_version": 2,
+            },
+        },
     }
 
 
@@ -585,5 +801,7 @@ def pressure_summary() -> Dict[str, Any]:
 
 
 @app.get("/rag/evidence")
-def get_rag_evidence(limit: int = Query(default=50, ge=1, le=200)) -> List[Dict[str, Any]]:
+def get_rag_evidence(
+    limit: int = Query(default=50, ge=1, le=200)
+) -> List[Dict[str, Any]]:
     return rag_evidence(limit=limit)

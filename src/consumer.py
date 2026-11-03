@@ -19,7 +19,12 @@ from src.config import (
 )
 from src.schema_registry import validate_order_event, explain_validation_error
 from src.healing_graph import healing_graph
-from src.db import insert_order, insert_incident, IdempotencyConflictError, log_event_journey
+from src.db import (
+    insert_order,
+    insert_incident,
+    IdempotencyConflictError,
+    log_event_journey,
+)
 from src.vector_memory import store_incident_memory
 from src.idempotency import payload_fingerprint
 from src.metrics import (
@@ -53,33 +58,56 @@ def safe_increment_retry(retry_key: str) -> None:
         print(f"Redis unavailable. Continuing without retry memory: {exc}")
 
 
-
-
 def is_consumer_paused() -> bool:
     try:
         return redis_client.get("consumer:paused") == "true"
     except Exception:
         return False
 
+
 def send_to_dlq(payload: Dict[str, Any], error_message: str):
     dlq_record = {"payload": payload, "error_message": error_message}
-    log_event_journey(payload.get("event_id"), payload, "dlq", "kafka_dlq", "quarantined", error_message, "send_to_dlq", risk_level="high", metadata={"topic": DLQ_TOPIC})
-    producer.produce(DLQ_TOPIC, key=str(payload.get("event_id", "unknown")), value=json.dumps(dlq_record))
+    log_event_journey(
+        payload.get("event_id"),
+        payload,
+        "dlq",
+        "kafka_dlq",
+        "quarantined",
+        error_message,
+        "send_to_dlq",
+        risk_level="high",
+        metadata={"topic": DLQ_TOPIC},
+    )
+    producer.produce(
+        DLQ_TOPIC,
+        key=str(payload.get("event_id", "unknown")),
+        value=json.dumps(dlq_record),
+    )
     producer.flush()
     EVENTS_DLQ.inc()
 
 
-def maybe_resume_after_human_interrupt(result: Dict[str, Any], thread_id: str) -> Dict[str, Any]:
+def maybe_resume_after_human_interrupt(
+    result: Dict[str, Any], thread_id: str
+) -> Dict[str, Any]:
     interrupts = result.get("__interrupt__")
     if not interrupts:
         return result
 
-    interrupt_payload = interrupts[0].value if hasattr(interrupts[0], "value") else interrupts[0]
+    interrupt_payload = (
+        interrupts[0].value if hasattr(interrupts[0], "value") else interrupts[0]
+    )
     print("\nHuman approval required")
     print(json.dumps(interrupt_payload, indent=2, default=str))
 
     if not ENABLE_TERMINAL_HUMAN_APPROVAL:
-        return {"final_status": "manual_review", "human_feedback": {"approved": False, "notes": "Terminal approval disabled"}}
+        return {
+            "final_status": "manual_review",
+            "human_feedback": {
+                "approved": False,
+                "notes": "Terminal approval disabled",
+            },
+        }
 
     user_input = input("Approve repair? Type yes or no: ").strip().lower()
     approved = user_input in {"y", "yes"}
@@ -116,42 +144,103 @@ def record_incident_and_memory(
         rag_evidence=rag_evidence,
     )
     try:
-        store_incident_memory(incident_id, payload, error_message, action, status, healed_payload)
+        store_incident_memory(
+            incident_id, payload, error_message, action, status, healed_payload
+        )
     except Exception as exc:
         print(f"Vector memory unavailable. Continuing without memory write: {exc}")
 
 
 def process_payload(payload: Dict[str, Any]):
     EVENTS_PROCESSED.inc()
-    log_event_journey(payload.get("event_id"), payload, "consumed", "consumer", "success", "Consumer received Kafka message", "consume")
+    log_event_journey(
+        payload.get("event_id"),
+        payload,
+        "consumed",
+        "consumer",
+        "success",
+        "Consumer received Kafka message",
+        "consume",
+    )
     fingerprint = payload_fingerprint(payload)
     retry_key = f"retry_count:{fingerprint}"
     retry_count = safe_get_retry_count(retry_key)
 
     if retry_count >= MAX_RETRY_COUNT:
         send_to_dlq(payload, "Max retry count exceeded")
-        record_incident_and_memory(payload, "max_retry_exceeded", "Max retry count exceeded", None, "send_to_dlq", "high", "failed", 1.0)
+        record_incident_and_memory(
+            payload,
+            "max_retry_exceeded",
+            "Max retry count exceeded",
+            None,
+            "send_to_dlq",
+            "high",
+            "failed",
+            1.0,
+        )
         EVENTS_FAILED.inc()
         return
 
     try:
         order = validate_order_event(payload)
-        log_event_journey(order.event_id, payload, "validated", "schema_registry", "success", "Payload passed schema validation", "validate")
+        log_event_journey(
+            order.event_id,
+            payload,
+            "validated",
+            "schema_registry",
+            "success",
+            "Payload passed schema validation",
+            "validate",
+        )
         insert_order(order)
-        log_event_journey(order.event_id, order.model_dump(), "inserted", "postgres", "success", "Clean record inserted or safely skipped", "insert_order")
+        log_event_journey(
+            order.event_id,
+            order.model_dump(),
+            "inserted",
+            "postgres",
+            "success",
+            "Clean record inserted or safely skipped",
+            "insert_order",
+        )
         EVENTS_VALID.inc()
         print(f"Inserted or skipped valid order: {order.event_id}")
         return
     except IdempotencyConflictError as exc:
         send_to_dlq(payload, str(exc))
-        log_event_journey(payload.get("event_id"), payload, "idempotency_conflict", "postgres", "failed", str(exc), "send_to_dlq", risk_level="high")
-        record_incident_and_memory(payload, "idempotency_conflict", str(exc), None, "send_to_dlq", "high", "failed", 1.0)
+        log_event_journey(
+            payload.get("event_id"),
+            payload,
+            "idempotency_conflict",
+            "postgres",
+            "failed",
+            str(exc),
+            "send_to_dlq",
+            risk_level="high",
+        )
+        record_incident_and_memory(
+            payload,
+            "idempotency_conflict",
+            str(exc),
+            None,
+            "send_to_dlq",
+            "high",
+            "failed",
+            1.0,
+        )
         EVENTS_FAILED.inc()
         return
     except Exception as exc:
         error_message = explain_validation_error(payload, exc)
         safe_increment_retry(retry_key)
-        log_event_journey(payload.get("event_id"), payload, "validation_failed", "schema_registry", "failed", error_message, "start_agent")
+        log_event_journey(
+            payload.get("event_id"),
+            payload,
+            "validation_failed",
+            "schema_registry",
+            "failed",
+            error_message,
+            "start_agent",
+        )
         print(f"Validation failed. Starting self healing graph. Error: {error_message}")
 
         thread_id = fingerprint
@@ -168,15 +257,27 @@ def process_payload(payload: Dict[str, Any]):
         }
 
         with observe_latency(REPAIR_LATENCY):
-            result = healing_graph.invoke(initial_state, config={"configurable": {"thread_id": thread_id}})
+            result = healing_graph.invoke(
+                initial_state, config={"configurable": {"thread_id": thread_id}}
+            )
             result = maybe_resume_after_human_interrupt(result, thread_id)
 
         decision = result.get("decision") or {}
         agent_trace = result.get("agent_trace") or []
         rag_evidence = result.get("similar_incidents") or []
-        log_event_journey(payload.get("event_id"), payload, "agent_decision", "langgraph_agent", final_status, decision.get("reason"), action=decision.get("action"), risk_level=decision.get("risk_level"), metadata={"agent_trace": agent_trace, "rag_evidence": rag_evidence})
-        healed_payload = result.get("healed_payload")
         final_status = result.get("final_status", "failed")
+        log_event_journey(
+            payload.get("event_id"),
+            payload,
+            "agent_decision",
+            "langgraph_agent",
+            final_status,
+            decision.get("reason"),
+            action=decision.get("action"),
+            risk_level=decision.get("risk_level"),
+            metadata={"agent_trace": agent_trace, "rag_evidence": rag_evidence},
+        )
+        healed_payload = result.get("healed_payload")
         action = decision.get("action", "send_to_dlq")
         risk_level = decision.get("risk_level")
         confidence = decision.get("confidence")
@@ -188,29 +289,99 @@ def process_payload(payload: Dict[str, Any]):
                 try:
                     redis_client.set(
                         f"healed:{fingerprint}",
-                        json.dumps({"original": payload, "healed": healed_payload, "action": action}),
+                        json.dumps(
+                            {
+                                "original": payload,
+                                "healed": healed_payload,
+                                "action": action,
+                            }
+                        ),
                         ex=86400,
                     )
                 except Exception:
                     pass
-                log_event_journey(healed_order.event_id, healed_payload, "agent_healed", "langgraph_agent", "success", "Reason Act Verify passed and healed record was inserted", action, risk_level, metadata={"agent_trace": agent_trace})
-                record_incident_and_memory(payload, "validation_error", error_message, healed_payload, action, risk_level, "healed", confidence, agent_trace, rag_evidence)
+                log_event_journey(
+                    healed_order.event_id,
+                    healed_payload,
+                    "agent_healed",
+                    "langgraph_agent",
+                    "success",
+                    "Reason Act Verify passed and healed record was inserted",
+                    action,
+                    risk_level,
+                    metadata={"agent_trace": agent_trace},
+                )
+                record_incident_and_memory(
+                    payload,
+                    "validation_error",
+                    error_message,
+                    healed_payload,
+                    action,
+                    risk_level,
+                    "healed",
+                    confidence,
+                    agent_trace,
+                    rag_evidence,
+                )
                 EVENTS_HEALED.inc()
                 print(f"Healed and inserted order: {healed_order.event_id}")
             except Exception as insert_exc:
                 send_to_dlq(payload, str(insert_exc))
-                record_incident_and_memory(payload, "post_healing_insert_failure", str(insert_exc), healed_payload, action, "high", "failed", confidence, agent_trace, rag_evidence)
+                record_incident_and_memory(
+                    payload,
+                    "post_healing_insert_failure",
+                    str(insert_exc),
+                    healed_payload,
+                    action,
+                    "high",
+                    "failed",
+                    confidence,
+                    agent_trace,
+                    rag_evidence,
+                )
                 EVENTS_FAILED.inc()
 
         elif final_status == "manual_review":
-            log_event_journey(payload.get("event_id"), payload, "human_review", "approval_queue", "pending", "Risk gate requires human approval", action, risk_level, metadata={"agent_trace": agent_trace})
-            record_incident_and_memory(payload, "validation_error", error_message, healed_payload, action, risk_level, "manual_review", confidence, agent_trace, rag_evidence)
+            log_event_journey(
+                payload.get("event_id"),
+                payload,
+                "human_review",
+                "approval_queue",
+                "pending",
+                "Risk gate requires human approval",
+                action,
+                risk_level,
+                metadata={"agent_trace": agent_trace},
+            )
+            record_incident_and_memory(
+                payload,
+                "validation_error",
+                error_message,
+                healed_payload,
+                action,
+                risk_level,
+                "manual_review",
+                confidence,
+                agent_trace,
+                rag_evidence,
+            )
             EVENTS_MANUAL_REVIEW.inc()
             print("Routed to manual review")
 
         else:
             send_to_dlq(payload, error_message)
-            record_incident_and_memory(payload, "validation_error", error_message, healed_payload, action, risk_level, "failed", confidence, agent_trace, rag_evidence)
+            record_incident_and_memory(
+                payload,
+                "validation_error",
+                error_message,
+                healed_payload,
+                action,
+                risk_level,
+                "failed",
+                confidence,
+                agent_trace,
+                rag_evidence,
+            )
             EVENTS_FAILED.inc()
             print("Sent to DLQ")
 

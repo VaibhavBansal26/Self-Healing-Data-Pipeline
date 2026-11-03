@@ -28,7 +28,9 @@ mcp = FastMCP("self-healing-data-pipeline")
 
 
 @mcp.tool()
-def search_similar_incidents(payload: Dict[str, Any], error_message: str, k: int = 3) -> List[Dict[str, Any]]:
+def search_similar_incidents(
+    payload: Dict[str, Any], error_message: str, k: int = 3
+) -> List[Dict[str, Any]]:
     """Search vector memory for similar data pipeline incidents."""
     return search_similar_incidents_tool(payload, error_message, k)
 
@@ -40,7 +42,9 @@ def get_redis_retry_count(fingerprint: str) -> Dict[str, Any]:
 
 
 @mcp.tool()
-def query_recent_incidents(limit: int = 10, status: Optional[str] = None) -> List[Dict[str, Any]]:
+def query_recent_incidents(
+    limit: int = 10, status: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Query recent PostgreSQL incident records."""
     return query_recent_incidents_tool(limit, status)
 

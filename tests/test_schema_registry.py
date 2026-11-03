@@ -16,11 +16,13 @@ def test_schema_version_unsupported():
 
 def test_validate_order_event_rejects_extra_fields():
     with pytest.raises(Exception):
-        validate_order_event({
-            "event_id": "e1",
-            "customer_id": "c1",
-            "amount": 10,
-            "currency": "USD",
-            "status": "paid",
-            "unknown": "field",
-        })
+        validate_order_event(
+            {
+                "event_id": "e1",
+                "customer_id": "c1",
+                "amount": 10,
+                "currency": "USD",
+                "status": "paid",
+                "unknown": "field",
+            }
+        )

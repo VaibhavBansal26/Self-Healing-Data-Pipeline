@@ -22,7 +22,9 @@ STATUS_MAP = {
 }
 
 
-def transform_order_payload(payload: Dict[str, Any], default_currency: str = "USD") -> Tuple[Dict[str, Any], List[str]]:
+def transform_order_payload(
+    payload: Dict[str, Any], default_currency: str = "USD"
+) -> Tuple[Dict[str, Any], List[str]]:
     """Return a transformed copy of an order payload and the applied steps.
 
     The function only performs safe, explainable transformations:
@@ -73,10 +75,14 @@ def transform_order_payload(payload: Dict[str, Any], default_currency: str = "US
     return transformed, steps
 
 
-def transform_many(payloads: List[Dict[str, Any]], default_currency: str = "USD") -> List[Dict[str, Any]]:
+def transform_many(
+    payloads: List[Dict[str, Any]], default_currency: str = "USD"
+) -> List[Dict[str, Any]]:
     """Transform a list of payloads and include transformation metadata."""
     output = []
     for payload in payloads:
-        transformed, steps = transform_order_payload(payload, default_currency=default_currency)
+        transformed, steps = transform_order_payload(
+            payload, default_currency=default_currency
+        )
         output.append({"original": payload, "transformed": transformed, "steps": steps})
     return output

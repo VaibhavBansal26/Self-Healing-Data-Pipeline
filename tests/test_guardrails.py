@@ -9,7 +9,9 @@ def test_guardrails_require_human_approval_for_low_confidence():
         "risk_level": "low",
         "requires_human_approval": False,
     }
-    result = enforce_decision_policy(decision, {"event_id": "e1", "customer_id": "c1"}, [])
+    result = enforce_decision_policy(
+        decision, {"event_id": "e1", "customer_id": "c1"}, []
+    )
     assert result["risk_level"] == "high"
     assert result["requires_human_approval"] is True
 
@@ -22,6 +24,8 @@ def test_guardrails_allow_numeric_string_cast_without_human_approval():
         "risk_level": "low",
         "requires_human_approval": False,
     }
-    result = enforce_decision_policy(decision, {"event_id": "e1", "customer_id": "c1", "amount": "10.00"}, [])
+    result = enforce_decision_policy(
+        decision, {"event_id": "e1", "customer_id": "c1", "amount": "10.00"}, []
+    )
     assert result["risk_level"] == "low"
     assert result["requires_human_approval"] is False

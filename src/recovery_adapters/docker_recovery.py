@@ -18,14 +18,24 @@ def restart_service(service: str) -> Dict[str, Any]:
     before = get_container_status(service)
     result = restart_container(service)
     after = get_container_status(service)
-    return {"ok": bool(result.get("ok")), "before": before, "action_result": result, "after": after}
+    return {
+        "ok": bool(result.get("ok")),
+        "before": before,
+        "action_result": result,
+        "after": after,
+    }
 
 
 def start_service(service: str) -> Dict[str, Any]:
     before = get_container_status(service)
     result = start_container(service)
     after = get_container_status(service)
-    return {"ok": bool(result.get("ok")), "before": before, "action_result": result, "after": after}
+    return {
+        "ok": bool(result.get("ok")),
+        "before": before,
+        "action_result": result,
+        "after": after,
+    }
 
 
 def service_logs(service: str, tail: int = 120) -> Dict[str, Any]:

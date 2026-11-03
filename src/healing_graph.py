@@ -26,6 +26,7 @@ def _build_llm() -> Optional[Any]:
         return None
     try:
         from langchain_openai import ChatOpenAI
+
         llm = ChatOpenAI(model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"), temperature=0)
         return llm.with_structured_output(HealingDecision)
     except Exception as exc:
@@ -40,6 +41,7 @@ def _redis_client():
     try:
         import redis
         from src.config import REDIS_HOST, REDIS_PORT
+
         return redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
     except Exception:
         return None
@@ -56,18 +58,21 @@ def retrieve_memory(state: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as exc:
         similar = [{"status": "memory_unavailable", "error": str(exc)}]
     state["similar_incidents"] = similar
-    state.setdefault("agent_trace", []).append({
-        "step": "RAG retrieve",
-        "reason": "Look up similar historic incidents before choosing an action.",
-        "evidence_count": len(similar) if isinstance(similar, list) else 0,
-        "act": "search_similar_incidents",
-    })
+    state.setdefault("agent_trace", []).append(
+        {
+            "step": "RAG retrieve",
+            "reason": "Look up similar historic incidents before choosing an action.",
+            "evidence_count": len(similar) if isinstance(similar, list) else 0,
+            "act": "search_similar_incidents",
+        }
+    )
     return state
 
 
 def _rule_based_decision(payload: Dict[str, Any], error_message: str) -> Dict[str, Any]:
     """Compatibility wrapper around the deterministic rules engine."""
     return decide_repair(payload, error_message).as_dict()
+
 
 def diagnose_error(state: Dict[str, Any]) -> Dict[str, Any]:
     payload = state["original_payload"]
@@ -81,7 +86,12 @@ def diagnose_error(state: Dict[str, Any]) -> Dict[str, Any]:
     # Use OpenAI only for ambiguous medium risk cases when a key exists and the
     # Redis backed rate limiter/circuit breaker allows it.
     llm_gate = should_call_llm(_redis_client())
-    if structured_llm is not None and decision["action"] == "manual_review" and decision["risk_level"] == "medium" and llm_gate.allowed:
+    if (
+        structured_llm is not None
+        and decision["action"] == "manual_review"
+        and decision["risk_level"] == "medium"
+        and llm_gate.allowed
+    ):
         redacted_payload = redact_payload(sanitize_llm_context(payload))
         prompt = f"""
 You are a data reliability agent for a Kafka streaming pipeline.
@@ -111,7 +121,14 @@ Rules:
 - Route missing customer_id or financial ambiguity to manual_review.
 """
         try:
-            with trace_run("healing_graph.diagnose_error", inputs={"payload": redacted_payload, "error_message": error_message}, metadata={"event_id": payload.get("event_id"), "agent": "langgraph_healing_agent"}):
+            with trace_run(
+                "healing_graph.diagnose_error",
+                inputs={"payload": redacted_payload, "error_message": error_message},
+                metadata={
+                    "event_id": payload.get("event_id"),
+                    "agent": "langgraph_healing_agent",
+                },
+            ):
                 decision = structured_llm.invoke(prompt).model_dump()
             prompt_tokens = estimate_tokens(prompt)
             completion_tokens = estimate_tokens(decision)
@@ -149,13 +166,15 @@ Rules:
 
     # Guardrails can still override the action.
     state["decision"] = enforce_decision_policy(decision, payload, similar_incidents)
-    state.setdefault("agent_trace", []).append({
-        "step": "Reason",
-        "reason": state["decision"].get("reason"),
-        "act": state["decision"].get("action"),
-        "risk_level": state["decision"].get("risk_level"),
-        "confidence": state["decision"].get("confidence"),
-    })
+    state.setdefault("agent_trace", []).append(
+        {
+            "step": "Reason",
+            "reason": state["decision"].get("reason"),
+            "act": state["decision"].get("action"),
+            "risk_level": state["decision"].get("risk_level"),
+            "confidence": state["decision"].get("confidence"),
+        }
+    )
     return state
 
 
@@ -165,11 +184,13 @@ def human_approval_gate(state: Dict[str, Any]) -> Dict[str, Any]:
     risk_level = decision.get("risk_level")
 
     if not requires_approval and risk_level != "high":
-        state.setdefault("agent_trace", []).append({
-            "step": "Risk gate",
-            "reason": "Low risk repair does not require human approval.",
-            "act": "continue_to_repair",
-        })
+        state.setdefault("agent_trace", []).append(
+            {
+                "step": "Risk gate",
+                "reason": "Low risk repair does not require human approval.",
+                "act": "continue_to_repair",
+            }
+        )
         return state
 
     approval = interrupt(
@@ -186,17 +207,21 @@ def human_approval_gate(state: Dict[str, Any]) -> Dict[str, Any]:
     state["human_feedback"] = approval
     if not approval or not approval.get("approved"):
         state["final_status"] = "manual_review"
-        state.setdefault("agent_trace", []).append({
-            "step": "Human approval",
-            "reason": "Repair is high risk or needs reviewer approval; terminal approval is disabled in Docker demo.",
-            "act": "route_to_manual_review",
-        })
+        state.setdefault("agent_trace", []).append(
+            {
+                "step": "Human approval",
+                "reason": "Repair is high risk or needs reviewer approval; terminal approval is disabled in Docker demo.",
+                "act": "route_to_manual_review",
+            }
+        )
     else:
-        state.setdefault("agent_trace", []).append({
-            "step": "Human approval",
-            "reason": approval.get("notes", "approved"),
-            "act": "approved_continue_to_repair",
-        })
+        state.setdefault("agent_trace", []).append(
+            {
+                "step": "Human approval",
+                "reason": approval.get("notes", "approved"),
+                "act": "approved_continue_to_repair",
+            }
+        )
     return state
 
 
@@ -217,14 +242,17 @@ def repair_payload(state: Dict[str, Any]) -> Dict[str, Any]:
     else:
         state["final_status"] = "failed"
 
-    state.setdefault("agent_trace", []).append({
-        "step": "Act",
-        "reason": repair_reason,
-        "act": action,
-        "healed_payload": state.get("healed_payload"),
-        "status": state.get("final_status"),
-    })
+    state.setdefault("agent_trace", []).append(
+        {
+            "step": "Act",
+            "reason": repair_reason,
+            "act": action,
+            "healed_payload": state.get("healed_payload"),
+            "status": state.get("final_status"),
+        }
+    )
     return state
+
 
 def verify_payload(state: Dict[str, Any]) -> Dict[str, Any]:
     healed_payload = state.get("healed_payload")
@@ -241,13 +269,15 @@ def verify_payload(state: Dict[str, Any]) -> Dict[str, Any]:
         state["verified"] = False
         state["final_status"] = "failed"
         reason = f"Repaired payload failed validation: {exc}"
-    state.setdefault("agent_trace", []).append({
-        "step": "Verify",
-        "reason": reason,
-        "act": "validate_repaired_payload",
-        "verified": state["verified"],
-        "status": state["final_status"],
-    })
+    state.setdefault("agent_trace", []).append(
+        {
+            "step": "Verify",
+            "reason": reason,
+            "act": "validate_repaired_payload",
+            "verified": state["verified"],
+            "status": state["final_status"],
+        }
+    )
     return state
 
 
@@ -269,7 +299,11 @@ def build_healing_graph():
     graph.add_edge("retrieve_memory", "diagnose_error")
     graph.add_edge("diagnose_error", "human_approval_gate")
     graph.add_edge("human_approval_gate", "repair_payload")
-    graph.add_conditional_edges("repair_payload", route_after_repair, {"verify_payload": "verify_payload", END: END})
+    graph.add_conditional_edges(
+        "repair_payload",
+        route_after_repair,
+        {"verify_payload": "verify_payload", END: END},
+    )
     graph.add_edge("verify_payload", END)
     return graph.compile(checkpointer=MemorySaver())
 

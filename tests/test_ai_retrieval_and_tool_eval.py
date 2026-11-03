@@ -22,7 +22,19 @@ def test_select_tool_for_dlq():
 
 
 def test_agent_trajectory_builds_steps():
-    health = {"agent_status":{"state":"detecting_and_planning", "headline":"testing"}, "stage_map":[{"label":"Postgres", "component":"postgres", "color":"red", "problem_type":"connection_failure", "suggested_action":"retry_postgres", "requires_human_approval":False}]}
+    health = {
+        "agent_status": {"state": "detecting_and_planning", "headline": "testing"},
+        "stage_map": [
+            {
+                "label": "Postgres",
+                "component": "postgres",
+                "color": "red",
+                "problem_type": "connection_failure",
+                "suggested_action": "retry_postgres",
+                "requires_human_approval": False,
+            }
+        ],
+    }
     trajectory = build_agent_trajectory(health, [])
     assert trajectory["active_stage_count"] == 1
     assert len(trajectory["trajectory_steps"]) >= 3

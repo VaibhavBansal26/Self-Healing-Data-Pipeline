@@ -11,14 +11,22 @@ def _vector_store():
     from langchain_chroma import Chroma
 
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
-    return Chroma(collection_name=CHROMA_COLLECTION, embedding_function=embeddings, persist_directory=CHROMA_PERSIST_DIR)
+    return Chroma(
+        collection_name=CHROMA_COLLECTION,
+        embedding_function=embeddings,
+        persist_directory=CHROMA_PERSIST_DIR,
+    )
 
 
 def incident_to_text(payload: Dict[str, Any], error_message: str) -> str:
-    return json.dumps({"payload": payload, "error_message": error_message}, sort_keys=True)
+    return json.dumps(
+        {"payload": payload, "error_message": error_message}, sort_keys=True
+    )
 
 
-def search_similar_incidents(payload: Dict[str, Any], error_message: str, k: int = 3) -> List[Dict[str, Any]]:
+def search_similar_incidents(
+    payload: Dict[str, Any], error_message: str, k: int = 3
+) -> List[Dict[str, Any]]:
     try:
         store = _vector_store()
         query = incident_to_text(payload, error_message)
@@ -28,7 +36,9 @@ def search_similar_incidents(payload: Dict[str, Any], error_message: str, k: int
             metadata = dict(doc.metadata)
             metadata["score"] = float(score)
             try:
-                metadata["original_payload"] = json.loads(metadata.get("original_payload", "{}"))
+                metadata["original_payload"] = json.loads(
+                    metadata.get("original_payload", "{}")
+                )
                 healed = metadata.get("healed_payload")
                 metadata["healed_payload"] = json.loads(healed) if healed else None
             except Exception:
@@ -58,8 +68,12 @@ def store_incident_memory(
             "action": action,
             "status": status,
             "original_payload": json.dumps(original_payload, sort_keys=True),
-            "healed_payload": json.dumps(healed_payload, sort_keys=True) if healed_payload else "",
+            "healed_payload": (
+                json.dumps(healed_payload, sort_keys=True) if healed_payload else ""
+            ),
         }
-        store.add_documents([Document(page_content=text, metadata=metadata)], ids=[str(uuid4())])
+        store.add_documents(
+            [Document(page_content=text, metadata=metadata)], ids=[str(uuid4())]
+        )
     except Exception as exc:
         print(f"Vector memory write skipped: {exc}")

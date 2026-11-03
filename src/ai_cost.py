@@ -5,7 +5,7 @@ import os
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 # Conservative default prices per 1M tokens. Override through env for real deployments.
 MODEL_PRICES_PER_1M: Dict[str, Dict[str, float]] = {
@@ -13,6 +13,7 @@ MODEL_PRICES_PER_1M: Dict[str, Dict[str, float]] = {
     "gpt-4o": {"input": 2.50, "output": 10.00},
     "default": {"input": 0.15, "output": 0.60},
 }
+
 
 @dataclass
 class CostRecord:
@@ -37,7 +38,11 @@ def _price_for(model: str) -> Dict[str, float]:
 
 def estimate_cost(model: str, prompt_tokens: int, completion_tokens: int) -> float:
     price = _price_for(model)
-    return round((prompt_tokens / 1_000_000) * price["input"] + (completion_tokens / 1_000_000) * price["output"], 8)
+    return round(
+        (prompt_tokens / 1_000_000) * price["input"]
+        + (completion_tokens / 1_000_000) * price["output"],
+        8,
+    )
 
 
 def estimate_tokens(text: Any) -> int:

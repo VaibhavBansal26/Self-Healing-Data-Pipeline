@@ -23,18 +23,32 @@ CHROMA_PERSIST_DIR = os.getenv("CHROMA_PERSIST_DIR", "./chroma_db")
 CHROMA_COLLECTION = os.getenv("CHROMA_COLLECTION", "pipeline_incidents")
 
 AUTO_APPROVE_LOW_RISK = os.getenv("AUTO_APPROVE_LOW_RISK", "true").lower() == "true"
-ENABLE_TERMINAL_HUMAN_APPROVAL = os.getenv("ENABLE_TERMINAL_HUMAN_APPROVAL", "true").lower() == "true"
+ENABLE_TERMINAL_HUMAN_APPROVAL = (
+    os.getenv("ENABLE_TERMINAL_HUMAN_APPROVAL", "true").lower() == "true"
+)
 
 MCP_CLIENT_MODE = os.getenv("MCP_CLIENT_MODE", "local")
 METRICS_PORT = int(os.getenv("METRICS_PORT", "9108"))
-ENABLE_PROMETHEUS_SERVER = os.getenv("ENABLE_PROMETHEUS_SERVER", "false").lower() == "true"
+ENABLE_PROMETHEUS_SERVER = (
+    os.getenv("ENABLE_PROMETHEUS_SERVER", "false").lower() == "true"
+)
 
 MAX_RETRY_COUNT = int(os.getenv("MAX_RETRY_COUNT", "3"))
 LLM_CONFIDENCE_THRESHOLD = float(os.getenv("LLM_CONFIDENCE_THRESHOLD", "0.80"))
 DEFAULT_SCHEMA_VERSION = int(os.getenv("DEFAULT_SCHEMA_VERSION", "1"))
-PII_FIELDS = {field.strip() for field in os.getenv("PII_FIELDS", "email,phone,ssn,address").split(",") if field.strip()}
+PII_FIELDS = {
+    field.strip()
+    for field in os.getenv("PII_FIELDS", "email,phone,ssn,address").split(",")
+    if field.strip()
+}
 
 
-AUTO_HEAL_PIPELINE_STEPS = os.getenv("AUTO_HEAL_PIPELINE_STEPS", "true").lower() == "true"
-PIPELINE_HEALTH_CHECK_TIMEOUT_SECONDS = int(os.getenv("PIPELINE_HEALTH_CHECK_TIMEOUT_SECONDS", "3"))
-AIRFLOW_API_BASE_URL = os.getenv("AIRFLOW_API_BASE_URL", "http://airflow-webserver:8080")
+AUTO_HEAL_PIPELINE_STEPS = (
+    os.getenv("AUTO_HEAL_PIPELINE_STEPS", "true").lower() == "true"
+)
+PIPELINE_HEALTH_CHECK_TIMEOUT_SECONDS = int(
+    os.getenv("PIPELINE_HEALTH_CHECK_TIMEOUT_SECONDS", "3")
+)
+AIRFLOW_API_BASE_URL = os.getenv(
+    "AIRFLOW_API_BASE_URL", "http://airflow-webserver:8080"
+)
