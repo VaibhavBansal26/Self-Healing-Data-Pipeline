@@ -35,6 +35,36 @@ def create_approval_request(
     }
 
 
+def find_pending_approval(
+    component: str, proposed_action: str
+) -> Dict[str, Any] | None:
+    """The open approval request for this component and action, if there is one.
+
+    The healer runs every few seconds; without this it files a new request for the
+    same unresolved problem on every cycle.
+    """
+    from src.db import get_db_connection
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """SELECT approval_id, step_incident_id FROM human_approval_requests
+                WHERE component=%s AND proposed_action=%s AND status='pending'
+                ORDER BY created_at DESC LIMIT 1;""",
+                (component, proposed_action),
+            )
+            row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        "approval_id": row[0],
+        "step_incident_id": row[1],
+        "component": component,
+        "proposed_action": proposed_action,
+        "status": "pending",
+    }
+
+
 def decide_approval(
     approval_id: int, status: str, reviewer: str = "dashboard", reviewer_notes: str = ""
 ) -> Dict[str, Any]:
