@@ -166,3 +166,26 @@ def test_dlq_decision_skips_the_approval_gate():
 
     interrupt.assert_not_called()
     assert out is state
+
+
+def test_database_outage_is_not_treated_as_a_validation_failure(harness):
+    import psycopg2
+
+    harness["validate"].side_effect = psycopg2.OperationalError("connection refused")
+
+    with pytest.raises(consumer.TransientInfrastructureError):
+        consumer.process_payload(dict(BAD_PAYLOAD))
+
+    harness["invoke"].assert_not_called()  # never reaches the repair agent
+    harness["dlq"].assert_not_called()  # never dead-lettered
+    harness["retry_inc"].assert_not_called()  # does not burn the retry budget
+
+
+def test_failure_tracker_backs_off_per_offset_and_resets():
+    tracker = consumer.FailureTracker(base=1.0, cap=4.0)
+
+    assert [tracker.record(0, 7) for _ in range(4)] == [1.0, 2.0, 4.0, 4.0]
+    assert tracker.attempts == 4
+    assert tracker.record(0, 8) == 1.0  # a different offset starts over
+    tracker.reset()
+    assert tracker.attempts == 0

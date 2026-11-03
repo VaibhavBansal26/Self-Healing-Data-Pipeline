@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import time
 from typing import Any, Dict
+import psycopg2
 import redis
-from confluent_kafka import Consumer, Producer
+from confluent_kafka import Consumer, Producer, TopicPartition
 from langgraph.types import Command
 
 from src.config import (
@@ -39,8 +40,22 @@ from src.metrics import (
     observe_latency,
 )
 
-redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+# Short socket timeouts: a dead Redis must cost milliseconds per event, not seconds.
+redis_client = redis.Redis(
+    host=REDIS_HOST,
+    port=REDIS_PORT,
+    decode_responses=True,
+    socket_connect_timeout=0.5,
+    socket_timeout=0.5,
+)
 producer = Producer({"bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS})
+
+
+class TransientInfrastructureError(Exception):
+    """A dependency (database) is unavailable. The record is fine; retry it later."""
+
+
+TRANSIENT_DB_ERRORS = (psycopg2.OperationalError, psycopg2.InterfaceError)
 
 
 def safe_get_retry_count(retry_key: str) -> int:
@@ -245,6 +260,10 @@ def process_payload(payload: Dict[str, Any]):
         EVENTS_FAILED.inc()
         return
     except Exception as exc:
+        if isinstance(exc, TRANSIENT_DB_ERRORS):
+            # Not a data problem: never route to the repair agent, the DLQ, or burn
+            # the record's retry budget because the database is down.
+            raise TransientInfrastructureError(str(exc)) from exc
         error_message = explain_validation_error(payload, exc)
         safe_increment_retry(retry_key)
         log_event_journey(
@@ -341,6 +360,8 @@ def process_payload(payload: Dict[str, Any]):
                 EVENTS_HEALED.inc()
                 print(f"Healed and inserted order: {healed_order.event_id}")
             except Exception as insert_exc:
+                if isinstance(insert_exc, TRANSIENT_DB_ERRORS):
+                    raise TransientInfrastructureError(str(insert_exc)) from insert_exc
                 send_to_dlq(payload, str(insert_exc))
                 record_incident_and_memory(
                     payload,
@@ -401,6 +422,32 @@ def process_payload(payload: Dict[str, Any]):
             print("Sent to DLQ")
 
 
+class FailureTracker:
+    """Consecutive failures on one offset, with capped exponential backoff."""
+
+    def __init__(self, base: float = 1.0, cap: float = 15.0):
+        self.base, self.cap = base, cap
+        self.key: tuple[int, int] | None = None
+        self.attempts = 0
+
+    def record(self, partition: int, offset: int) -> float:
+        key = (partition, offset)
+        self.attempts = self.attempts + 1 if key == self.key else 1
+        self.key = key
+        return min(self.cap, self.base * 2 ** (self.attempts - 1))
+
+    def reset(self) -> None:
+        self.key, self.attempts = None, 0
+
+
+def _safe_payload(msg) -> Dict[str, Any]:
+    try:
+        value = json.loads(msg.value().decode("utf-8"))
+        return value if isinstance(value, dict) else {"raw": value}
+    except Exception:
+        return {"raw": msg.value().decode("utf-8", errors="replace")}
+
+
 def start_consumer():
     maybe_start_metrics_server()
     consumer = Consumer(
@@ -412,6 +459,7 @@ def start_consumer():
         }
     )
     consumer.subscribe([RAW_TOPIC])
+    failures = FailureTracker()
     print("Consumer started")
 
     try:
@@ -432,9 +480,30 @@ def start_consumer():
                 payload = json.loads(msg.value().decode("utf-8"))
                 process_payload(payload)
                 consumer.commit(msg)
+                failures.reset()
             except Exception as exc:
                 EVENTS_FAILED.inc()
-                print(f"Unexpected processing failure: {exc}")
+                transient = isinstance(
+                    exc, (TransientInfrastructureError, *TRANSIENT_DB_ERRORS)
+                )
+                delay = failures.record(msg.partition(), msg.offset())
+                print(
+                    f"Processing failed ({'transient' if transient else 'unexpected'}): {exc}"
+                )
+                if not transient and failures.attempts > MAX_RETRY_COUNT:
+                    # Poison message: park it instead of blocking the partition forever.
+                    send_to_dlq(
+                        _safe_payload(msg),
+                        f"Unprocessable after {MAX_RETRY_COUNT} attempts: {exc}",
+                    )
+                    consumer.commit(msg)
+                    failures.reset()
+                    continue
+                # Rewind to the failed offset so it is retried, never skipped.
+                consumer.seek(
+                    TopicPartition(msg.topic(), msg.partition(), msg.offset())
+                )
+                time.sleep(delay)
     finally:
         consumer.close()
 

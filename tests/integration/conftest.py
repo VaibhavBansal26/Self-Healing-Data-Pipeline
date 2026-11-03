@@ -161,3 +161,26 @@ class Helpers:
 @pytest.fixture
 def h():
     return Helpers
+
+
+@pytest.fixture(scope="session")
+def chaos_topic(infra):
+    """A dedicated raw topic so chaos consumers never compete with the session consumer."""
+    from confluent_kafka.admin import NewTopic
+
+    topic = f"it_chaos_{uuid.uuid4().hex[:6]}"
+    for fut in infra.create_topics([NewTopic(topic, 1, 1)]).values():
+        fut.result(timeout=15)
+    return topic
+
+
+def pytest_terminal_summary(terminalreporter):
+    if os.getenv("RUN_INTEGRATION") != "1":
+        return
+    from chaos import RESULTS
+
+    if not RESULTS:
+        return
+    terminalreporter.section("chaos results")
+    for row in RESULTS:
+        terminalreporter.write_line(json.dumps(row, sort_keys=True))
