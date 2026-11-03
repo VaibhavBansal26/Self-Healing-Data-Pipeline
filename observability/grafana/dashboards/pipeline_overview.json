@@ -1,0 +1,11 @@
+{
+  "title": "Self Healing Pipeline Overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "panels": [
+    {"type": "timeseries", "title": "Events processed", "targets": [{"expr": "rate(pipeline_events_processed_total[1m])"}]},
+    {"type": "stat", "title": "Healing success rate", "targets": [{"expr": "sum(pipeline_events_healed_total) / clamp_min(sum(pipeline_events_failed_total + pipeline_events_healed_total), 1)"}]},
+    {"type": "timeseries", "title": "DLQ events", "targets": [{"expr": "rate(pipeline_events_dlq_total[1m])"}]},
+    {"type": "histogram", "title": "Repair latency", "targets": [{"expr": "pipeline_repair_latency_seconds_bucket"}]}
+  ]
+}

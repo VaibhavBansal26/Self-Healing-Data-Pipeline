@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: self_healing_consumer
+    static_configs:
+      - targets: ["consumer:9108"]

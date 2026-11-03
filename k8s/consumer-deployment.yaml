@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: self-healing-consumer
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: self-healing-consumer
+  template:
+    metadata:
+      labels:
+        app: self-healing-consumer
+    spec:
+      containers:
+        - name: consumer
+          image: self-healing-data-pipeline:latest
+          imagePullPolicy: IfNotPresent
+          command: ["python", "-m", "src.consumer"]
+          envFrom:
+            - configMapRef:
+                name: self-healing-pipeline-config
+            - secretRef:
+                name: self-healing-pipeline-secrets
+          ports:
+            - containerPort: 9108
+              name: metrics
+          readinessProbe:
+            tcpSocket:
+              port: 9108
+            initialDelaySeconds: 10
+            periodSeconds: 10

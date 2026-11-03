@@ -1,0 +1,87 @@
+<svg width="1400" height="780" viewBox="0 0 1400 780" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#2563eb"/></marker>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-color="#0f172a" flood-opacity="0.12"/></filter>
+    <style>
+      .bg{fill:#f8fafc}.card{fill:white;stroke:#dbeafe;stroke-width:2;rx:18;filter:url(#shadow)}
+      .title{font:700 22px Inter,Arial;fill:#0f172a}.sub{font:500 14px Inter,Arial;fill:#475569}.label{font:700 16px Inter,Arial;fill:#0f172a}.small{font:500 12px Inter,Arial;fill:#64748b}
+      .green{fill:#dcfce7;stroke:#22c55e}.yellow{fill:#fef9c3;stroke:#eab308}.blue{fill:#dbeafe;stroke:#3b82f6}.red{fill:#fee2e2;stroke:#ef4444}.purple{fill:#ede9fe;stroke:#8b5cf6}
+      .line{stroke:#2563eb;stroke-width:3;fill:none;marker-end:url(#arrow)}
+      .dash{stroke:#94a3b8;stroke-width:2;stroke-dasharray:8 8;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect class="bg" width="1400" height="780"/>
+  <text x="60" y="64" class="title">AI-Powered Self-Healing Data Pipeline Platform</text>
+  <text x="60" y="92" class="sub">Record-level healing + pipeline-stage auto recovery with LangGraph, RAG memory, MCP tools, Docker-aware recovery, and human approval</text>
+
+  <g transform="translate(60,140)">
+    <rect class="card blue" width="180" height="92"/>
+    <text x="20" y="36" class="label">React UI</text>
+    <text x="20" y="62" class="small">Dashboard, stage map,</text><text x="20" y="78" class="small">auto-healer console</text>
+  </g>
+  <g transform="translate(300,140)">
+    <rect class="card blue" width="180" height="92"/>
+    <text x="20" y="36" class="label">FastAPI</text>
+    <text x="20" y="62" class="small">Control plane, APIs,</text><text x="20" y="78" class="small">policy endpoints</text>
+  </g>
+  <g transform="translate(540,140)">
+    <rect class="card" width="180" height="92"/>
+    <text x="20" y="36" class="label">Kafka</text>
+    <text x="20" y="62" class="small">raw_orders, DLQ,</text><text x="20" y="78" class="small">streaming backbone</text>
+  </g>
+  <g transform="translate(780,140)">
+    <rect class="card" width="180" height="92"/>
+    <text x="20" y="36" class="label">Consumer</text>
+    <text x="20" y="62" class="small">Validation, routing,</text><text x="20" y="78" class="small">record healing</text>
+  </g>
+  <g transform="translate(1020,140)">
+    <rect class="card green" width="180" height="92"/>
+    <text x="20" y="36" class="label">PostgreSQL</text>
+    <text x="20" y="62" class="small">Orders, incidents,</text><text x="20" y="78" class="small">approval history</text>
+  </g>
+
+  <path class="line" d="M240 186 H300"/><path class="line" d="M480 186 H540"/><path class="line" d="M720 186 H780"/><path class="line" d="M960 186 H1020"/>
+
+  <g transform="translate(300,330)">
+    <rect class="card purple" width="220" height="120"/>
+    <text x="20" y="34" class="label">LangGraph Agent</text>
+    <text x="20" y="60" class="small">Reason → Act → Verify</text><text x="20" y="78" class="small">safe vs risky decisions</text><text x="20" y="96" class="small">human-spoken updates</text>
+  </g>
+  <g transform="translate(580,330)">
+    <rect class="card purple" width="220" height="120"/>
+    <text x="20" y="34" class="label">RAG Memory</text>
+    <text x="20" y="60" class="small">Similar incidents,</text><text x="20" y="78" class="small">semantic cache,</text><text x="20" y="96" class="small">success-rate memory</text>
+  </g>
+  <g transform="translate(860,330)">
+    <rect class="card purple" width="220" height="120"/>
+    <text x="20" y="34" class="label">MCP Tool Mesh</text>
+    <text x="20" y="60" class="small">Kafka, DB, Redis,</text><text x="20" y="78" class="small">Airflow, Docker, logs</text><text x="20" y="96" class="small">as callable tools</text>
+  </g>
+
+  <path class="dash" d="M870 232 C820 285, 500 275, 410 330"/>
+  <path class="line" d="M520 390 H580"/><path class="line" d="M800 390 H860"/>
+  <path class="dash" d="M970 330 C1070 285, 1110 260, 1110 232"/>
+
+  <g transform="translate(60,560)">
+    <rect class="card yellow" width="250" height="105"/>
+    <text x="20" y="34" class="label">Auto-Healer Worker</text>
+    <text x="20" y="60" class="small">Background monitor only:</text><text x="20" y="78" class="small">detects unhealthy stages</text><text x="20" y="96" class="small">then calls agent flow</text>
+  </g>
+  <g transform="translate(370,560)">
+    <rect class="card red" width="250" height="105"/>
+    <text x="20" y="34" class="label">Risk Policy</text>
+    <text x="20" y="60" class="small">Safe actions auto-run;</text><text x="20" y="78" class="small">risky replay/schema/db</text><text x="20" y="96" class="small">actions need approval</text>
+  </g>
+  <g transform="translate(680,560)">
+    <rect class="card green" width="250" height="105"/>
+    <text x="20" y="34" class="label">Recovery Adapters</text>
+    <text x="20" y="60" class="small">Docker restart, Kafka topic,</text><text x="20" y="78" class="small">Airflow restart, Redis,</text><text x="20" y="96" class="small">verification checks</text>
+  </g>
+  <g transform="translate(990,560)">
+    <rect class="card blue" width="250" height="105"/>
+    <text x="20" y="34" class="label">Observability</text>
+    <text x="20" y="60" class="small">Terminal console, traces,</text><text x="20" y="78" class="small">metrics, logs, charts,</text><text x="20" y="96" class="small">benchmark reports</text>
+  </g>
+  <path class="line" d="M310 612 H370"/><path class="line" d="M620 612 H680"/><path class="line" d="M930 612 H990"/>
+  <path class="dash" d="M185 560 C220 500, 330 475, 410 450"/>
+</svg>

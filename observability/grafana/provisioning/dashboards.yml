@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: self-healing-pipeline
+    orgId: 1
+    folder: Self Healing Pipeline
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards
