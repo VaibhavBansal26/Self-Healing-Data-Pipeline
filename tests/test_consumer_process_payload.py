@@ -115,3 +115,54 @@ def test_missing_final_status_defaults_to_failed_and_dlq(harness):
         if c.args[2] == "agent_decision"
     ]
     assert journey_statuses == ["failed"]
+
+
+def test_pending_interrupt_is_read_from_checkpoint_when_result_has_no_marker():
+    """langgraph 0.2.x omits __interrupt__ from invoke(); the checkpoint has it."""
+    task = mock.Mock(interrupts=[mock.Mock(value={"message": "approve?"})])
+    snapshot = mock.Mock(tasks=[task])
+    with mock.patch.object(consumer.healing_graph, "get_state", return_value=snapshot):
+        assert consumer._pending_interrupt({"final_status": "pending"}, "t1") == {
+            "message": "approve?"
+        }
+
+
+def test_no_pending_interrupt_returns_none():
+    snapshot = mock.Mock(tasks=[mock.Mock(interrupts=[])])
+    with mock.patch.object(consumer.healing_graph, "get_state", return_value=snapshot):
+        assert consumer._pending_interrupt({}, "t1") is None
+
+
+def test_paused_record_becomes_manual_review_and_keeps_its_decision():
+    result = {
+        "decision": {"action": "manual_review", "risk_level": "high"},
+        "final_status": "pending",
+    }
+    snapshot = mock.Mock(
+        tasks=[mock.Mock(interrupts=[mock.Mock(value={"message": "approve?"})])]
+    )
+    with (
+        mock.patch.object(consumer.healing_graph, "get_state", return_value=snapshot),
+        mock.patch.object(consumer, "ENABLE_TERMINAL_HUMAN_APPROVAL", False),
+    ):
+        out = consumer.maybe_resume_after_human_interrupt(result, "t1")
+
+    assert out["final_status"] == "manual_review"
+    assert out["decision"]["action"] == "manual_review"
+
+
+def test_dlq_decision_skips_the_approval_gate():
+    from src.healing_graph import human_approval_gate
+
+    state = {
+        "decision": {
+            "action": "send_to_dlq",
+            "risk_level": "high",
+            "requires_human_approval": False,
+        }
+    }
+    with mock.patch("src.healing_graph.interrupt") as interrupt:
+        out = human_approval_gate(state)
+
+    interrupt.assert_not_called()
+    assert out is state

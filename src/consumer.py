@@ -87,21 +87,36 @@ def send_to_dlq(payload: Dict[str, Any], error_message: str):
     EVENTS_DLQ.inc()
 
 
+def _pending_interrupt(result: Dict[str, Any], thread_id: str) -> Any:
+    """Return the payload of a paused human-approval interrupt, or None.
+
+    Newer LangGraph releases put ``__interrupt__`` in the invoke() result. The
+    pinned 0.2.x does not, so also read the thread's checkpoint.
+    """
+    interrupts = result.get("__interrupt__")
+    if interrupts:
+        return interrupts[0].value if hasattr(interrupts[0], "value") else interrupts[0]
+    snapshot = healing_graph.get_state({"configurable": {"thread_id": thread_id}})
+    for task in snapshot.tasks:
+        if task.interrupts:
+            first = task.interrupts[0]
+            return first.value if hasattr(first, "value") else first
+    return None
+
+
 def maybe_resume_after_human_interrupt(
     result: Dict[str, Any], thread_id: str
 ) -> Dict[str, Any]:
-    interrupts = result.get("__interrupt__")
-    if not interrupts:
+    interrupt_payload = _pending_interrupt(result, thread_id)
+    if interrupt_payload is None:
         return result
 
-    interrupt_payload = (
-        interrupts[0].value if hasattr(interrupts[0], "value") else interrupts[0]
-    )
     print("\nHuman approval required")
     print(json.dumps(interrupt_payload, indent=2, default=str))
 
     if not ENABLE_TERMINAL_HUMAN_APPROVAL:
         return {
+            **result,
             "final_status": "manual_review",
             "human_feedback": {
                 "approved": False,
