@@ -124,7 +124,30 @@ def _recovery_allowed() -> bool:
     return os.getenv("ENABLE_DOCKER_RECOVERY", "false").lower() == "true"
 
 
+def protected_services() -> set[str]:
+    """Services the healer must never act on: the API that executes heals and the
+    healer itself. Restarting either would cut off the recovery in progress."""
+    raw = os.getenv("HEALER_PROTECTED_SERVICES", "data-api,auto-healer")
+    return {name.strip() for name in raw.split(",") if name.strip()}
+
+
+def _is_protected(service_or_container: str) -> bool:
+    # Match the service name and every container alias of each protected service,
+    # so "data-api" and "healing_data_api" are both refused.
+    blocked = set()
+    for name in protected_services():
+        blocked.add(name)
+        blocked.update(_name_candidates(name))
+    return service_or_container in blocked
+
+
 def start_container(service_or_container: str) -> Dict[str, Any]:
+    if _is_protected(service_or_container):
+        return {
+            "ok": False,
+            "service": service_or_container,
+            "reason": "protected_service",
+        }
     if not _recovery_allowed():
         return {
             "ok": False,
@@ -164,6 +187,12 @@ def start_container(service_or_container: str) -> Dict[str, Any]:
 
 
 def restart_container(service_or_container: str) -> Dict[str, Any]:
+    if _is_protected(service_or_container):
+        return {
+            "ok": False,
+            "service": service_or_container,
+            "reason": "protected_service",
+        }
     if not _recovery_allowed():
         return {
             "ok": False,

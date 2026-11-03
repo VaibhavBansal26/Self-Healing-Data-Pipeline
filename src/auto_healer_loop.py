@@ -15,7 +15,7 @@ INTERVAL_SECONDS = int(os.getenv("AUTO_HEAL_INTERVAL_SECONDS", "8"))
 AUTO_HEAL_ENABLED = os.getenv("AUTO_HEAL_PIPELINE_STEPS", "true").lower() == "true"
 # These two values are intentionally UI-focused. Healing can be too fast to see,
 # so we hold a visible state long enough for the dashboard to show the agent cycle.
-DEMO_DELAY_SECONDS = int(os.getenv("AUTO_HEAL_DEMO_DELAY_SECONDS", "6"))
+DEMO_DELAY_SECONDS = int(os.getenv("AUTO_HEAL_DEMO_DELAY_SECONDS", "0"))
 VISIBILITY_HOLD_SECONDS = int(os.getenv("AUTO_HEAL_VISIBILITY_HOLD_SECONDS", "90"))
 
 
