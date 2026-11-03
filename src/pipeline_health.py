@@ -22,6 +22,7 @@ from src.db import (
     list_pipeline_step_incidents,
 )
 from src.alerting import send_alert
+from src.heal_budget import HealBudget
 from src.approval_workflow import create_approval_request
 from src.log_diagnoser import diagnose_component_logs
 from src.pipeline_learning import remember_recovery, action_success_summary
@@ -61,6 +62,7 @@ class PipelineHealingAgent:
 
     def __init__(self):
         self.kafka_admin = AdminClient({"bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS})
+        self.budget = HealBudget.from_env()
 
     # ---------- Health checks ----------
     def check_kafka_topics(self) -> List[ComponentHealth]:
@@ -830,6 +832,7 @@ class PipelineHealingAgent:
             if c["component"] == component and c["status"] != "healthy"
         ]
         if not problems:
+            self.budget.record_success(component)
             return {
                 "component": component,
                 "status": "already_healthy",
@@ -844,6 +847,10 @@ class PipelineHealingAgent:
             plan.get("requires_human_approval")
             or problem.get("requires_human_approval")
         )
+        if not requires_approval or approve_risky:
+            decision = self.budget.check(component)
+            if not decision.allowed:
+                return self._budget_blocked(component, action, problem, decision)
         incident_id = insert_pipeline_step_incident(
             component=component,
             problem_type=problem.get("problem_type", "unknown"),
@@ -896,6 +903,7 @@ class PipelineHealingAgent:
                 "action": action,
                 "agent_plan": plan,
             }
+        self.budget.record_attempt(component)
         result = self._execute_action(problem, action)
         verify = self.full_health_check()
         still_bad = [
@@ -904,6 +912,8 @@ class PipelineHealingAgent:
             if c["component"] == component and c["status"] != "healthy"
         ]
         final_status = "healed" if not still_bad else "failed"
+        if final_status == "healed":
+            self.budget.record_success(component)
         update_pipeline_step_incident(
             incident_id,
             final_status,
@@ -938,6 +948,54 @@ class PipelineHealingAgent:
             "result": result,
             "agent_plan": plan,
             "verification": verify,
+        }
+
+    def _budget_blocked(
+        self, component: str, action: Optional[str], problem: Dict[str, Any], decision
+    ) -> Dict[str, Any]:
+        """Skip an automatic heal because the component's recovery budget is spent.
+
+        Only the first exhaustion writes an incident and raises an alert; later
+        cycles return quietly so a dead component does not spam the log or pager.
+        """
+        status = "escalated" if decision.status == "exhausted" else "backoff"
+        if decision.first_exhaustion:
+            message = (
+                f"Automatic recovery for {component} gave up after "
+                f"{decision.attempts} attempts; a human needs to look at it."
+            )
+            incident_id = insert_pipeline_step_incident(
+                component=component,
+                problem_type=problem.get("problem_type", "unknown"),
+                reason=message,
+                detected_state={"health_signal": problem.get("detected_state") or {}},
+                recovery_action=action,
+                risk_level=problem.get("risk_level") or "medium",
+                status="escalated",
+                requires_human_approval=True,
+            )
+            send_alert(
+                component, "critical", message, {"step_incident_id": incident_id}
+            )
+            remember_recovery(
+                component,
+                problem.get("problem_type", "unknown"),
+                action,
+                "failed",
+                {"budget": decision.as_dict()},
+            )
+            trace_event(
+                "pipeline_recovery",
+                component,
+                "escalated",
+                metadata={"action": action, "budget": decision.as_dict()},
+            )
+        return {
+            "component": component,
+            "status": status,
+            "action": action,
+            "reason": problem.get("reason"),
+            "budget": decision.as_dict(),
         }
 
     def heal_all_safe(self) -> Dict[str, Any]:
