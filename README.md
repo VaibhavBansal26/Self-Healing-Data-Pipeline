@@ -4,6 +4,19 @@ A production-style reliability lab for streaming data pipelines. The platform co
 
 > **Project status:** Portfolio/research demo, not a hardened production deployment. Recovery actions can affect local Docker services; use in an isolated development environment.
 
+## See it heal
+
+![Postgres outage while events flow: all 80 orders stored, 0 duplicates, 0 lost](docs/assets/self-healing-demo.gif)
+
+A real recording of the Postgres-outage chaos scenario. Forty orders are published while the database is down; the consumer keeps retrying the same message with growing delays, and once Postgres returns all 80 orders are stored with no duplicates and no losses. The text is captured from an actual run (a single run on a laptop, so timings vary) and idle gaps are shortened for playback; the clock shows real elapsed time.
+
+Regenerate it against the integration stack (needs Pillow):
+
+```bash
+docker compose -f tests/integration/docker-compose.yml up -d --wait
+RUN_INTEGRATION=1 PYTHONPATH=.:tests/integration python scripts/make_demo_gif.py
+```
+
 ## What it does
 
 - **Ingestion and data repair:** Validates Kafka events, applies deterministic rules, optionally reasons about harder problems with an LLM, persists valid records, and routes unrecoverable events to the DLQ.
