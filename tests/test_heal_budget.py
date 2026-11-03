@@ -256,3 +256,70 @@ def test_demo_delay_is_off_by_default(monkeypatch):
     reloaded = importlib.reload(auto_healer_loop)
 
     assert reloaded.DEMO_DELAY_SECONDS == 0
+
+
+# --- evidence must not grow with every incident ------------------------------------
+
+
+def test_past_incidents_are_quoted_as_compact_summaries():
+    from src import pipeline_health as ph
+
+    huge = {"nested": "x" * 100_000}
+    rows = [
+        {
+            "step_incident_id": i,
+            "component": "consumer",
+            "problem_type": "consumer_container_down",
+            "recovery_action": "restart_consumer_container",
+            "risk_level": "medium",
+            "status": "failed",
+            "created_at": "2026-11-03T00:00:00",
+            "detected_state": huge,
+            "verification_result": huge,
+        }
+        for i in range(10)
+    ]
+    agent = ph.PipelineHealingAgent.__new__(ph.PipelineHealingAgent)
+    with mock.patch.object(ph, "list_pipeline_step_incidents", return_value=rows):
+        memory = agent._memory_for_component(
+            "consumer", "consumer_container_down", "restart_consumer_container"
+        )
+
+    assert len(memory["similar_decisions"]) == 5
+    assert all(set(d) == set(ph._EVIDENCE_FIELDS) for d in memory["similar_decisions"])
+    assert len(str(memory)) < 3000
+    assert memory["failed_count"] == 10  # counts still use every matching row
+
+
+def test_incident_size_stays_flat_across_repeated_failures():
+    """Feed each incident's stored state back in as the next one's history, 15 times."""
+    from src import pipeline_health as ph
+
+    store: list[dict] = []
+    agent = ph.PipelineHealingAgent.__new__(ph.PipelineHealingAgent)
+    sizes = []
+    with mock.patch.object(
+        ph, "list_pipeline_step_incidents", side_effect=lambda limit=100: list(store)
+    ):
+        for i in range(15):
+            memory = agent._memory_for_component(
+                "consumer", "consumer_container_down", "restart_consumer_container"
+            )
+            detected_state = {"agent_plan": {"memory_evidence": memory}}
+            sizes.append(len(str(detected_state)))
+            store.insert(
+                0,
+                {
+                    "step_incident_id": i,
+                    "component": "consumer",
+                    "problem_type": "consumer_container_down",
+                    "recovery_action": "restart_consumer_container",
+                    "risk_level": "medium",
+                    "status": "failed",
+                    "created_at": "t",
+                    "detected_state": detected_state,
+                    "verification_result": {"post_check": detected_state},
+                },
+            )
+
+    assert max(sizes) < 3000, sizes

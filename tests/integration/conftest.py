@@ -82,7 +82,9 @@ def clean_state(infra):
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute(
-                "TRUNCATE orders, pipeline_incidents, event_journey RESTART IDENTITY CASCADE;"
+                "TRUNCATE orders, pipeline_incidents, event_journey, pipeline_step_incidents, "
+                "human_approval_requests, alert_events, recovery_action_memory, "
+                "pipeline_trace_events RESTART IDENTITY CASCADE;"
             )
     yield
 

@@ -23,7 +23,7 @@ from src.db import (
 )
 from src.alerting import send_alert
 from src.heal_budget import HealBudget
-from src.approval_workflow import create_approval_request
+from src.approval_workflow import create_approval_request, find_pending_approval
 from src.log_diagnoser import diagnose_component_logs
 from src.pipeline_learning import remember_recovery, action_success_summary
 from src.trace_events import trace_event
@@ -43,6 +43,24 @@ class ComponentHealth:
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+
+# Fields kept from a past incident when it is quoted as evidence. Quoting whole rows
+# would embed their own detected_state/verification_result, which already contain
+# earlier evidence, so every new incident would be about 3x the size of the last.
+_EVIDENCE_FIELDS = (
+    "step_incident_id",
+    "component",
+    "problem_type",
+    "recovery_action",
+    "risk_level",
+    "status",
+    "created_at",
+)
+
+
+def summarize_incident(row: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: row.get(key) for key in _EVIDENCE_FIELDS}
 
 
 class PipelineHealingAgent:
@@ -444,7 +462,7 @@ class PipelineHealingAgent:
             "component": component,
             "problem_type": problem_type,
             "candidate_action": action,
-            "similar_decisions": similar[:5],
+            "similar_decisions": [summarize_incident(r) for r in similar[:5]],
             "success_rate_for_action": round(healed / total, 3) if total else None,
             "healed_count": healed,
             "failed_count": failed,
@@ -847,6 +865,17 @@ class PipelineHealingAgent:
             plan.get("requires_human_approval")
             or problem.get("requires_human_approval")
         )
+        if requires_approval and not approve_risky:
+            existing = find_pending_approval(component, action)
+            if existing:
+                return {
+                    "component": component,
+                    "status": "manual_review",
+                    "approval": existing,
+                    "action": action,
+                    "agent_plan": plan,
+                    "already_pending": True,
+                }
         if not requires_approval or approve_risky:
             decision = self.budget.check(component)
             if not decision.allowed:
